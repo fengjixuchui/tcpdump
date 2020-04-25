@@ -2461,7 +2461,7 @@ DIAG_ON_CLANG(assign-enum)
 		 */
 		if (!ndo->ndo_vflag && !WFileName) {
 			(void)fprintf(stderr,
-			    "%s: verbose output suppressed, use -v or -vv for full protocol decode\n",
+			    "%s: verbose output suppressed, use -v[v]... for full protocol decode\n",
 			    program_name);
 		} else
 			(void)fprintf(stderr, "%s: ", program_name);
@@ -3128,7 +3128,9 @@ print_version(void)
 	(void)fprintf (stderr, "Compiled with AddressSanitizer/GCC.\n");
 #elif defined(__has_feature)
 #  if __has_feature(address_sanitizer)
-	(void)fprintf (stderr, "Compiled with AddressSanitizer/CLang.\n");
+	(void)fprintf (stderr, "Compiled with AddressSanitizer/Clang.\n");
+#  elif __has_feature(memory_sanitizer)
+	(void)fprintf (stderr, "Compiled with MemorySanitizer/Clang.\n");
 #  endif
 #endif /* __SANITIZE_ADDRESS__ or __has_feature */
 }
