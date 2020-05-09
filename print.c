@@ -69,9 +69,6 @@ static const struct uint_printer uint_printers[] = {
 #ifdef DLT_NETANALYZER_TRANSPARENT
 	{ netanalyzer_transparent_if_print, DLT_NETANALYZER_TRANSPARENT },
 #endif
-#ifdef DLT_NFLOG
-	{ nflog_if_print,	DLT_NFLOG},
-#endif
 #ifdef DLT_CIP
 	{ cip_if_print,		DLT_CIP },
 #endif
@@ -117,10 +114,6 @@ static const struct uint_printer uint_printers[] = {
 	{ mfr_if_print,		DLT_MFR },
 #endif
 	{ atm_if_print,		DLT_ATM_RFC1483 },
-	{ sl_if_print,		DLT_SLIP },
-#ifdef DLT_SLIP_BSDOS
-	{ sl_bsdos_if_print,	DLT_SLIP_BSDOS },
-#endif
 #ifdef DLT_LTALK
 	{ ltalk_if_print,	DLT_LTALK },
 #endif
@@ -226,6 +219,9 @@ static const struct void_printer void_printers[] = {
 #ifdef DLT_IPNET
 	{ ipnet_if_print,	DLT_IPNET },
 #endif
+#ifdef DLT_NFLOG
+	{ nflog_if_print,	DLT_NFLOG},
+#endif
 	{ null_if_print,	DLT_NULL },
 #ifdef DLT_LOOP
 	{ null_if_print,	DLT_LOOP },
@@ -243,6 +239,10 @@ static const struct void_printer void_printers[] = {
 #ifdef DLT_IPV6
 	{ raw_if_print,		DLT_IPV6 },
 #endif
+#ifdef DLT_SLIP_BSDOS
+	{ sl_bsdos_if_print,	DLT_SLIP_BSDOS },
+#endif
+	{ sl_if_print,		DLT_SLIP },
 #ifdef DLT_SUNATM
 	{ sunatm_if_print,	DLT_SUNATM },
 #endif
