@@ -40,20 +40,7 @@ compiler:
 #
 jobs:
   exclude:
-  - arch: ppc64le
-    os: osx
-  - arch: s390x
-    os: osx
-  - arch: arm64
-    os: osx
-  - compiler: gcc
-    os: osx
-  - arch: ppc64le
-    env: COVERITY_SCAN_BRANCH=1
-  - arch: s390x
-    env: COVERITY_SCAN_BRANCH=1
-  - arch: arm64
-    env: COVERITY_SCAN_BRANCH=1
+  - if: branch = "master"
 
 cache: ccache
 
@@ -130,6 +117,7 @@ before_install:
   - if [ "$TRAVIS_OS_NAME" = linux ]; then apt list --installed 'lib*-dev'; fi
 
 install:
+  - gem install travis-conditions
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install libsmi | grep -v '%'; fi
 
 before_script:
