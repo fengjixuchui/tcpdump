@@ -35,8 +35,11 @@
 	        Reservable link bandwidth subTLV #10, length: 4, 1000.000 Mbps
 	        Maximum link bandwidth subTLV #9, length: 4, 1000.000 Mbps
 	        Administrative groups subTLV #3, length: 4, 0x00000000
-	        unknown subTLV #32, length: 11
-		    0x0000:  3000 0192 0168 0002 0000 12
+	        LAN Adjacency Segment Identifier subTLV #32, length: 11
+	          Flags: [Value, Local significance]
+	          Weight: 0
+	          Neighbor System-ID: 0192.0168.0002
+	          Label: 18
 	      IS Neighbor: 0192.0168.0003.02, Metric: 63, sub-TLVs present (81)
 	        IPv4 interface address subTLV #6, length: 4, 10.0.13.1
 	        Link Local/Remote Identifier subTLV #4, length: 8, 0x00000182, 0x00000000
@@ -52,8 +55,11 @@
 	        Reservable link bandwidth subTLV #10, length: 4, 1000.000 Mbps
 	        Maximum link bandwidth subTLV #9, length: 4, 1000.000 Mbps
 	        Administrative groups subTLV #3, length: 4, 0x00000000
-	        unknown subTLV #32, length: 11
-		    0x0000:  3000 0192 0168 0003 0000 10
+	        LAN Adjacency Segment Identifier subTLV #32, length: 11
+	          Flags: [Value, Local significance]
+	          Weight: 0
+	          Neighbor System-ID: 0192.0168.0003
+	          Label: 16
 	    Extended IS Reachability TLV #22, length: 92
 	      IS Neighbor: 0192.0168.0004.02, Metric: 63, sub-TLVs present (81)
 	        IPv4 interface address subTLV #6, length: 4, 10.0.14.1
@@ -70,8 +76,11 @@
 	        Reservable link bandwidth subTLV #10, length: 4, 1000.000 Mbps
 	        Maximum link bandwidth subTLV #9, length: 4, 1000.000 Mbps
 	        Administrative groups subTLV #3, length: 4, 0x00000000
-	        unknown subTLV #32, length: 11
-		    0x0000:  3000 0192 0168 0004 0000 11
+	        LAN Adjacency Segment Identifier subTLV #32, length: 11
+	          Flags: [Value, Local significance]
+	          Weight: 0
+	          Neighbor System-ID: 0192.0168.0004
+	          Label: 17
 	    IPv4 Internal Reachability TLV #128, length: 60
 	      IPv4 prefix:       10.0.12.0/24, Distribution: up, Metric: 10, Internal
 	      IPv4 prefix:       10.0.13.0/24, Distribution: up, Metric: 63, Internal
