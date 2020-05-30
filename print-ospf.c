@@ -301,7 +301,7 @@ ospf_te_lsa_print(netdissect_options *ndo,
 
         switch(tlv_type) {
         case LS_OPAQUE_TE_TLV_LINK:
-            while (tlv_length >= sizeof(subtlv_type) + sizeof(subtlv_length)) {
+            while (tlv_length != 0) {
                 if (tlv_length < 4) {
                     ND_PRINT("\n\t    Remaining TLV length %u < 4",
                            tlv_length);
@@ -322,6 +322,11 @@ ospf_te_lsa_print(netdissect_options *ndo,
                        subtlv_type,
                        subtlv_length);
 
+                if (tlv_length < subtlv_length) {
+                    ND_PRINT("\n\t    Remaining TLV length %u < %u",
+                           tlv_length + 4, subtlv_length + 4);
+                    return -1;
+                }
                 ND_TCHECK_LEN(tptr, subtlv_length);
                 switch(subtlv_type) {
                 case LS_OPAQUE_TE_LINK_SUBTLV_ADMIN_GROUP:
@@ -471,6 +476,11 @@ ospf_te_lsa_print(netdissect_options *ndo,
                 if (subtlv_length%4 != 0)
                     subtlv_length+=4-(subtlv_length%4);
 
+                if (tlv_length < subtlv_length) {
+                    ND_PRINT("\n\t    Remaining TLV length %u < %u",
+                           tlv_length + 4, subtlv_length + 4);
+                    return -1;
+                }
                 tlv_length-=subtlv_length;
                 tptr+=subtlv_length;
 
@@ -496,6 +506,11 @@ ospf_te_lsa_print(netdissect_options *ndo,
         /* in OSPF everything has to be 32-bit aligned, including TLVs */
         if (tlv_length%4 != 0)
             tlv_length+=4-(tlv_length%4);
+        if (tlv_length > ls_length) {
+            ND_PRINT("\n\t    Bogus padded length %u > %u", tlv_length,
+                   ls_length);
+            return -1;
+        }
         ls_length-=tlv_length;
         tptr+=tlv_length;
     }
@@ -624,15 +639,21 @@ ospf_print_lsa(netdissect_options *ndo,
 	const struct aslametric *almp;
 	const struct mcla *mcp;
 	const uint8_t *lp;
-	int j, tlv_type, tlv_length, topology;
-	int ls_length;
+	u_int tlv_type, tlv_length, rla_count, topology;
+	int ospf_print_lshdr_ret;
+	u_int ls_length;
 	const uint8_t *tptr;
 
 	tptr = (const uint8_t *)lsap->lsa_un.un_unknown; /* squelch compiler warnings */
-        ls_length = ospf_print_lshdr(ndo, &lsap->ls_hdr);
-        if (ls_length == -1)
-                return(NULL);
+	ospf_print_lshdr_ret = ospf_print_lshdr(ndo, &lsap->ls_hdr);
+	if (ospf_print_lshdr_ret < 0)
+		return(NULL);
+	ls_length = (u_int)ospf_print_lshdr_ret;
 	ls_end = (const uint8_t *)lsap + ls_length;
+	/*
+	 * ospf_print_lshdr() returns -1 if the length is too short,
+	 * so we know ls_length is >= sizeof(struct lsa_hdr).
+	 */
 	ls_length -= sizeof(struct lsa_hdr);
 
 	switch (GET_U_1(lsap->ls_hdr.ls_type)) {
@@ -643,10 +664,10 @@ ospf_print_lsa(netdissect_options *ndo,
 		          bittok2str(ospf_rla_flag_values, "none", GET_U_1(lsap->lsa_un.un_rla.rla_flags)));
 
 		ND_TCHECK_2(lsap->lsa_un.un_rla.rla_count);
-		j = GET_BE_U_2(lsap->lsa_un.un_rla.rla_count);
+		rla_count = GET_BE_U_2(lsap->lsa_un.un_rla.rla_count);
 		ND_TCHECK_SIZE(lsap->lsa_un.un_rla.rla_link);
 		rlp = lsap->lsa_un.un_rla.rla_link;
-		while (j--) {
+		for (u_int i = rla_count; i != 0; i--) {
 			ND_TCHECK_SIZE(rlp);
 			switch (GET_U_1(rlp->un_tos.link.link_type)) {
 
@@ -806,25 +827,26 @@ ospf_print_lsa(netdissect_options *ndo,
             case LS_OPAQUE_TYPE_RI:
 		tptr = (const uint8_t *)(lsap->lsa_un.un_ri_tlv);
 
-		while (ls_length != 0) {
+		u_int ls_length_remaining = ls_length;
+		while (ls_length_remaining != 0) {
                     ND_TCHECK_4(tptr);
-		    if (ls_length < 4) {
-                        ND_PRINT("\n\t    Remaining LS length %u < 4", ls_length);
+		    if (ls_length_remaining < 4) {
+                        ND_PRINT("\n\t    Remaining LS length %u < 4", ls_length_remaining);
                         return(ls_end);
                     }
                     tlv_type = GET_BE_U_2(tptr);
                     tlv_length = GET_BE_U_2(tptr + 2);
                     tptr+=4;
-                    ls_length-=4;
+                    ls_length_remaining-=4;
 
                     ND_PRINT("\n\t    %s TLV (%u), length: %u, value: ",
                            tok2str(lsa_opaque_ri_tlv_values,"unknown",tlv_type),
                            tlv_type,
                            tlv_length);
 
-                    if (tlv_length > ls_length) {
-                        ND_PRINT("\n\t    Bogus length %u > %u", tlv_length,
-                            ls_length);
+                    if (tlv_length > ls_length_remaining) {
+                        ND_PRINT("\n\t    Bogus length %u > remaining LS length %u", tlv_length,
+                            ls_length_remaining);
                         return(ls_end);
                     }
                     ND_TCHECK_LEN(tptr, tlv_length);
@@ -847,7 +869,7 @@ ospf_print_lsa(netdissect_options *ndo,
 
                     }
                     tptr+=tlv_length;
-                    ls_length-=tlv_length;
+                    ls_length_remaining-=tlv_length;
                 }
                 break;
 

@@ -891,6 +891,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/.devel OR EXISTS ${CMAKE_BINARY_DIR}/.devel)
         check_and_add_compiler_option(-Wassign-enum)
         check_and_add_compiler_option(-Wcast-qual)
         check_and_add_compiler_option(-Wmissing-prototypes)
+        check_and_add_compiler_option(-Wmissing-variable-declarations)
         check_and_add_compiler_option(-Wold-style-definition)
         check_and_add_compiler_option(-Wpedantic)
         check_and_add_compiler_option(-Wpointer-arith)
@@ -1017,6 +1018,7 @@ set(NETDISSECT_SOURCE_LIST_C
     print-lwapp.c
     print-lwres.c
     print-m3ua.c
+    print-macsec.c
     print-mobile.c
     print-mobility.c
     print-mpcp.c

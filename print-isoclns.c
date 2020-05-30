@@ -1135,9 +1135,9 @@ clnp_print(netdissect_options *ndo,
 
         default:
             /* dump the PDU specific data */
-            if (length-(pptr-optr) > 0) {
+            if (length > ND_BYTES_BETWEEN(pptr, optr)) {
                 ND_PRINT("\n\t  undecoded non-header data, length %u", length-li);
-                print_unknown_data(ndo, pptr, "\n\t  ", length - (int)(pptr - optr));
+                print_unknown_data(ndo, pptr, "\n\t  ", length - ND_BYTES_BETWEEN(pptr, optr));
             }
         }
 
@@ -1382,8 +1382,12 @@ esis_print(netdissect_options *ndo,
 
 	default:
 		if (ndo->ndo_vflag <= 1) {
-			if (pptr < ndo->ndo_snapend)
-				print_unknown_data(ndo, pptr, "\n\t  ", (int)(ndo->ndo_snapend - pptr));
+			/*
+			 * If there's at least one byte to print, print
+			 * it/them.
+			 */
+			if (ND_TTEST_LEN(pptr, 1))
+				print_unknown_data(ndo, pptr, "\n\t  ", ND_BYTES_AVAILABLE_AFTER(pptr));
 		}
 		return;
 	}
@@ -1921,10 +1925,14 @@ isis_print_ip_reach_subtlv(netdissect_options *ndo,
 	    algo = GET_U_1(tptr+1);
 
 	    if (flags & ISIS_PREFIX_SID_FLAG_V) {
+	        if (subl < 5)
+	            goto trunc;
 		sid = GET_BE_U_3(tptr+2);
 		tptr+=5;
 		subl-=5;
 	    } else {
+	        if (subl < 6)
+	            goto trunc;
 		sid = GET_BE_U_4(tptr+2);
 		tptr+=6;
 		subl-=6;

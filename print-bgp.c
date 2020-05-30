@@ -924,7 +924,7 @@ bgp_rt_prefix_print(netdissect_options *ndo,
     /* allocate space for the largest possible string */
     char rtc_prefix_in_hex[20] = "";
     u_int rtc_prefix_in_hex_len = 0;
-    static char output[60]; /* max response string */
+    static char output[61]; /* max response string */
     uint16_t ec_type = 0;
     u_int octet_count;
     u_int i;
@@ -2119,6 +2119,8 @@ bgp_attr_print(netdissect_options *ndo,
         tlen -= 3;
 
         ND_TCHECK_1(tptr);
+        if (tlen < 1)
+            goto trunc;
         nhlen = GET_U_1(tptr);
         tptr++;
         tlen--;
@@ -2297,6 +2299,7 @@ bgp_attr_print(netdissect_options *ndo,
                 tlen--;
                 if (tlen < snpalen)
                     goto trunc;
+                ND_TCHECK_LEN(tptr, snpalen);
                 tptr += snpalen;
                 tlen -= snpalen;
             }
@@ -2383,7 +2386,6 @@ bgp_attr_print(netdissect_options *ndo,
             goto trunc;
         flags = GET_U_1(tptr);
         tunnel_type = GET_U_1(tptr + 1);
-        tlen = len;
 
         ND_PRINT("\n\t    Tunnel-type %s (%u), Flags [%s], MPLS Label %u",
                   tok2str(bgp_pmsi_tunnel_values, "Unknown", tunnel_type),
@@ -2438,8 +2440,6 @@ bgp_attr_print(netdissect_options *ndo,
     {
         uint8_t type;
         uint16_t length;
-
-        tlen = len;
 
         while (tlen >= 3) {
 
