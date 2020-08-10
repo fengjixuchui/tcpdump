@@ -42,18 +42,67 @@
 
 #include "pcap-missing.h"
 
-struct uint_printer {
-	uint_if_printer f;
+struct printer {
+	if_printer f;
 	int type;
 };
 
-struct void_printer {
-	void_if_printer f;
-	int type;
-};
-
-static const struct uint_printer uint_printers[] = {
+static const struct printer printers[] = {
+#ifdef DLT_APPLE_IP_OVER_IEEE1394
+	{ ap1394_if_print,	DLT_APPLE_IP_OVER_IEEE1394 },
+#endif
+	{ arcnet_if_print,	DLT_ARCNET },
+#ifdef DLT_ARCNET_LINUX
+	{ arcnet_linux_if_print, DLT_ARCNET_LINUX },
+#endif
+	{ atm_if_print,		DLT_ATM_RFC1483 },
+#ifdef DLT_DSA_TAG_BRCM
+	{ brcm_tag_if_print,	DLT_DSA_TAG_BRCM },
+#endif
+#ifdef DLT_DSA_TAG_BRCM_PREPEND
+	{ brcm_tag_prepend_if_print, DLT_DSA_TAG_BRCM_PREPEND },
+#endif
+#ifdef DLT_BLUETOOTH_HCI_H4_WITH_PHDR
+	{ bt_if_print,		DLT_BLUETOOTH_HCI_H4_WITH_PHDR},
+#endif
+#ifdef DLT_C_HDLC
+	{ chdlc_if_print,	DLT_C_HDLC },
+#endif
+#ifdef DLT_HDLC
+	{ chdlc_if_print,	DLT_HDLC },
+#endif
+#ifdef DLT_ATM_CLIP
+	{ cip_if_print,		DLT_ATM_CLIP },
+#endif
+#ifdef DLT_CIP
+	{ cip_if_print,		DLT_CIP },
+#endif
+#ifdef DLT_DSA_TAG_DSA
+	{ dsa_if_print,		DLT_DSA_TAG_DSA },
+#endif
+#ifdef DLT_DSA_TAG_EDSA
+	{ edsa_if_print,	DLT_DSA_TAG_EDSA },
+#endif
+#ifdef DLT_ENC
+	{ enc_if_print,		DLT_ENC },
+#endif
 	{ ether_if_print,	DLT_EN10MB },
+	{ fddi_if_print,	DLT_FDDI },
+#ifdef DLT_FR
+	{ fr_if_print,		DLT_FR },
+#endif
+#ifdef DLT_FRELAY
+	{ fr_if_print,		DLT_FRELAY },
+#endif
+#ifdef DLT_IEEE802_11
+	{ ieee802_11_if_print,	DLT_IEEE802_11},
+#endif
+#ifdef DLT_IEEE802_11_RADIO_AVS
+	{ ieee802_11_radio_avs_if_print, DLT_IEEE802_11_RADIO_AVS },
+#endif
+#ifdef DLT_IEEE802_11_RADIO
+	{ ieee802_11_radio_if_print,	DLT_IEEE802_11_RADIO },
+#endif
 #ifdef DLT_IEEE802_15_4
 	{ ieee802_15_4_if_print, DLT_IEEE802_15_4 },
 #endif
@@ -63,65 +112,35 @@ static const struct uint_printer uint_printers[] = {
 #ifdef DLT_IEEE802_15_4_TAP
 	{ ieee802_15_4_tap_if_print, DLT_IEEE802_15_4_TAP },
 #endif
-#ifdef DLT_NETANALYZER
-	{ netanalyzer_if_print, DLT_NETANALYZER },
-#endif
-#ifdef DLT_NETANALYZER_TRANSPARENT
-	{ netanalyzer_transparent_if_print, DLT_NETANALYZER_TRANSPARENT },
-#endif
-#ifdef DLT_CIP
-	{ cip_if_print,		DLT_CIP },
-#endif
-#ifdef DLT_ATM_CLIP
-	{ cip_if_print,		DLT_ATM_CLIP },
-#endif
 #ifdef DLT_IP_OVER_FC
 	{ ipfc_if_print,	DLT_IP_OVER_FC },
 #endif
-#ifdef DLT_LANE8023
-	{ lane_if_print,	DLT_LANE8023 },
+#ifdef DLT_IPNET
+	{ ipnet_if_print,	DLT_IPNET },
 #endif
 #ifdef DLT_IPOIB
 	{ ipoib_if_print,       DLT_IPOIB },
-#endif
-#ifdef DLT_C_HDLC
-	{ chdlc_if_print,	DLT_C_HDLC },
-#endif
-#ifdef DLT_HDLC
-	{ chdlc_if_print,	DLT_HDLC },
-#endif
-#ifdef DLT_PPP_ETHER
-	{ pppoe_if_print,	DLT_PPP_ETHER },
-#endif
-#if defined(DLT_PFLOG) && defined(HAVE_NET_IF_PFLOG_H)
-	{ pflog_if_print,	DLT_PFLOG },
-#endif
-	{ token_if_print,	DLT_IEEE802 },
-	{ fddi_if_print,	DLT_FDDI },
-#ifdef DLT_LINUX_SLL
-	{ sll_if_print,		DLT_LINUX_SLL },
-#endif
-#ifdef DLT_LINUX_SLL2
-	{ sll2_if_print,	DLT_LINUX_SLL2 },
-#endif
-#ifdef DLT_FR
-	{ fr_if_print,		DLT_FR },
-#endif
-#ifdef DLT_FRELAY
-	{ fr_if_print,		DLT_FRELAY },
-#endif
-#ifdef DLT_MFR
-	{ mfr_if_print,		DLT_MFR },
-#endif
-	{ atm_if_print,		DLT_ATM_RFC1483 },
-#ifdef DLT_LTALK
-	{ ltalk_if_print,	DLT_LTALK },
 #endif
 #ifdef DLT_JUNIPER_ATM1
 	{ juniper_atm1_if_print, DLT_JUNIPER_ATM1 },
 #endif
 #ifdef DLT_JUNIPER_ATM2
 	{ juniper_atm2_if_print, DLT_JUNIPER_ATM2 },
+#endif
+#ifdef DLT_JUNIPER_CHDLC
+	{ juniper_chdlc_if_print,	DLT_JUNIPER_CHDLC },
+#endif
+#ifdef DLT_JUNIPER_ES
+	{ juniper_es_if_print,	DLT_JUNIPER_ES },
+#endif
+#ifdef DLT_JUNIPER_ETHER
+	{ juniper_ether_if_print,	DLT_JUNIPER_ETHER },
+#endif
+#ifdef DLT_JUNIPER_FRELAY
+	{ juniper_frelay_if_print,	DLT_JUNIPER_FRELAY },
+#endif
+#ifdef DLT_JUNIPER_GGSN
+	{ juniper_ggsn_if_print, DLT_JUNIPER_GGSN },
 #endif
 #ifdef DLT_JUNIPER_MFR
 	{ juniper_mfr_if_print,	DLT_JUNIPER_MFR },
@@ -132,92 +151,32 @@ static const struct uint_printer uint_printers[] = {
 #ifdef DLT_JUNIPER_MLPPP
 	{ juniper_mlppp_if_print, DLT_JUNIPER_MLPPP },
 #endif
-#ifdef DLT_JUNIPER_PPPOE
-	{ juniper_pppoe_if_print, DLT_JUNIPER_PPPOE },
-#endif
-#ifdef DLT_JUNIPER_PPPOE_ATM
-	{ juniper_pppoe_atm_if_print, DLT_JUNIPER_PPPOE_ATM },
-#endif
-#ifdef DLT_JUNIPER_GGSN
-	{ juniper_ggsn_if_print, DLT_JUNIPER_GGSN },
-#endif
-#ifdef DLT_JUNIPER_ES
-	{ juniper_es_if_print,	DLT_JUNIPER_ES },
-#endif
 #ifdef DLT_JUNIPER_MONITOR
 	{ juniper_monitor_if_print, DLT_JUNIPER_MONITOR },
-#endif
-#ifdef DLT_JUNIPER_SERVICES
-	{ juniper_services_if_print, DLT_JUNIPER_SERVICES },
-#endif
-#ifdef DLT_JUNIPER_ETHER
-	{ juniper_ether_if_print,	DLT_JUNIPER_ETHER },
 #endif
 #ifdef DLT_JUNIPER_PPP
 	{ juniper_ppp_if_print,	DLT_JUNIPER_PPP },
 #endif
-#ifdef DLT_JUNIPER_FRELAY
-	{ juniper_frelay_if_print,	DLT_JUNIPER_FRELAY },
+#ifdef DLT_JUNIPER_PPPOE_ATM
+	{ juniper_pppoe_atm_if_print, DLT_JUNIPER_PPPOE_ATM },
 #endif
-#ifdef DLT_JUNIPER_CHDLC
-	{ juniper_chdlc_if_print,	DLT_JUNIPER_CHDLC },
+#ifdef DLT_JUNIPER_PPPOE
+	{ juniper_pppoe_if_print, DLT_JUNIPER_PPPOE },
 #endif
-#ifdef DLT_IEEE802_11_RADIO
-	{ ieee802_11_radio_if_print,	DLT_IEEE802_11_RADIO },
+#ifdef DLT_JUNIPER_SERVICES
+	{ juniper_services_if_print, DLT_JUNIPER_SERVICES },
 #endif
-#ifdef DLT_IEEE802_11
-	{ ieee802_11_if_print,	DLT_IEEE802_11},
+#ifdef DLT_LTALK
+	{ ltalk_if_print,	DLT_LTALK },
 #endif
-#ifdef DLT_IEEE802_11_RADIO_AVS
-	{ ieee802_11_radio_avs_if_print,	DLT_IEEE802_11_RADIO_AVS },
+#ifdef DLT_MFR
+	{ mfr_if_print,		DLT_MFR },
 #endif
-#ifdef DLT_PRISM_HEADER
-	{ prism_if_print,	DLT_PRISM_HEADER },
+#ifdef DLT_NETANALYZER
+	{ netanalyzer_if_print, DLT_NETANALYZER },
 #endif
-	{ ppp_if_print,		DLT_PPP },
-#ifdef DLT_PPP_WITHDIRECTION
-	{ ppp_if_print,		DLT_PPP_WITHDIRECTION },
-#endif
-#ifdef DLT_PPP_BSDOS
-	{ ppp_bsdos_if_print,	DLT_PPP_BSDOS },
-#endif
-#ifdef DLT_PPP_SERIAL
-	{ ppp_hdlc_if_print,	DLT_PPP_SERIAL },
-#endif
-#ifdef DLT_DSA_TAG_BRCM
-	{ brcm_tag_if_print,	DLT_DSA_TAG_BRCM },
-#endif
-#ifdef DLT_DSA_TAG_BRCM_PREPEND
-	{ brcm_tag_prepend_if_print, DLT_DSA_TAG_BRCM_PREPEND },
-#endif
-#ifdef DLT_VSOCK
-	{ vsock_if_print,	DLT_VSOCK },
-#endif
-#ifdef DLT_DSA_TAG_DSA
-	{ dsa_if_print,	DLT_DSA_TAG_DSA },
-#endif
-#ifdef DLT_DSA_TAG_EDSA
-	{ edsa_if_print,	DLT_DSA_TAG_EDSA },
-#endif
-	{ NULL,			0 },
-};
-
-static const struct void_printer void_printers[] = {
-#ifdef DLT_APPLE_IP_OVER_IEEE1394
-	{ ap1394_if_print,	DLT_APPLE_IP_OVER_IEEE1394 },
-#endif
-	{ arcnet_if_print,	DLT_ARCNET },
-#ifdef DLT_ARCNET_LINUX
-	{ arcnet_linux_if_print, DLT_ARCNET_LINUX },
-#endif
-#ifdef DLT_BLUETOOTH_HCI_H4_WITH_PHDR
-	{ bt_if_print,		DLT_BLUETOOTH_HCI_H4_WITH_PHDR},
-#endif
-#ifdef DLT_ENC
-	{ enc_if_print,		DLT_ENC },
-#endif
-#ifdef DLT_IPNET
-	{ ipnet_if_print,	DLT_IPNET },
+#ifdef DLT_NETANALYZER_TRANSPARENT
+	{ netanalyzer_transparent_if_print, DLT_NETANALYZER_TRANSPARENT },
 #endif
 #ifdef DLT_NFLOG
 	{ nflog_if_print,	DLT_NFLOG},
@@ -226,11 +185,30 @@ static const struct void_printer void_printers[] = {
 #ifdef DLT_LOOP
 	{ null_if_print,	DLT_LOOP },
 #endif
+#if defined(DLT_PFLOG) && defined(HAVE_NET_IF_PFLOG_H)
+	{ pflog_if_print,	DLT_PFLOG },
+#endif
 #ifdef DLT_PKTAP
 	{ pktap_if_print,	DLT_PKTAP },
 #endif
 #ifdef DLT_PPI
 	{ ppi_if_print,		DLT_PPI },
+#endif
+#ifdef DLT_PPP_BSDOS
+	{ ppp_bsdos_if_print,	DLT_PPP_BSDOS },
+#endif
+#ifdef DLT_PPP_SERIAL
+	{ ppp_hdlc_if_print,	DLT_PPP_SERIAL },
+#endif
+	{ ppp_if_print,		DLT_PPP },
+#ifdef DLT_PPP_PPPD
+	{ ppp_if_print,		DLT_PPP_PPPD },
+#endif
+#ifdef DLT_PPP_ETHER
+	{ pppoe_if_print,	DLT_PPP_ETHER },
+#endif
+#ifdef DLT_PRISM_HEADER
+	{ prism_if_print,	DLT_PRISM_HEADER },
 #endif
 	{ raw_if_print,		DLT_RAW },
 #ifdef DLT_IPV4
@@ -243,18 +221,28 @@ static const struct void_printer void_printers[] = {
 	{ sl_bsdos_if_print,	DLT_SLIP_BSDOS },
 #endif
 	{ sl_if_print,		DLT_SLIP },
+#ifdef DLT_LINUX_SLL
+	{ sll_if_print,		DLT_LINUX_SLL },
+#endif
+#ifdef DLT_LINUX_SLL2
+	{ sll2_if_print,	DLT_LINUX_SLL2 },
+#endif
 #ifdef DLT_SUNATM
 	{ sunatm_if_print,	DLT_SUNATM },
 #endif
 #ifdef DLT_SYMANTEC_FIREWALL
 	{ symantec_if_print,	DLT_SYMANTEC_FIREWALL },
 #endif
+	{ token_if_print,	DLT_IEEE802 },
 #ifdef DLT_USB_LINUX
 	{ usb_linux_48_byte_if_print, DLT_USB_LINUX},
 #endif /* DLT_USB_LINUX */
 #ifdef DLT_USB_LINUX_MMAPPED
 	{ usb_linux_64_byte_if_print, DLT_USB_LINUX_MMAPPED},
 #endif /* DLT_USB_LINUX_MMAPPED */
+#ifdef DLT_VSOCK
+	{ vsock_if_print,	DLT_VSOCK },
+#endif
 	{ NULL,                 0 },
 };
 
@@ -281,12 +269,12 @@ init_print(netdissect_options *ndo, uint32_t localnet, uint32_t mask)
 	init_checksum();
 }
 
-uint_if_printer
-lookup_uint_printer(int type)
+if_printer
+lookup_printer(int type)
 {
-	const struct uint_printer *p;
+	const struct printer *p;
 
-	for (p = uint_printers; p->f; ++p)
+	for (p = printers; p->f; ++p)
 		if (type == p->type)
 			return p->f;
 
@@ -308,7 +296,7 @@ lookup_uint_printer(int type)
 	 * that.
 	 */
 	if (type == DLT_USER2) {
-		for (p = uint_printers; p->f; ++p)
+		for (p = printers; p->f; ++p)
 			if (DLT_PKTAP == p->type)
 				return p->f;
 	}
@@ -316,74 +304,22 @@ lookup_uint_printer(int type)
 
 	return NULL;
 	/* NOTREACHED */
-}
-
-void_if_printer
-lookup_void_printer(int type)
-{
-	const struct void_printer *p;
-
-	for (p = void_printers; p->f; ++p)
-		if (type == p->type)
-			return p->f;
-
-#if defined(DLT_USER2) && defined(DLT_PKTAP)
-	/*
-	 * Apple incorrectly chose to use DLT_USER2 for their PKTAP
-	 * header.
-	 *
-	 * We map DLT_PKTAP, whether it's DLT_USER2 as it is on Darwin-
-	 * based OSes or the same value as LINKTYPE_PKTAP as it is on
-	 * other OSes, to LINKTYPE_PKTAP, so files written with
-	 * this version of libpcap for a DLT_PKTAP capture have a link-
-	 * layer header type of LINKTYPE_PKTAP.
-	 *
-	 * However, files written on OS X Mavericks for a DLT_PKTAP
-	 * capture have a link-layer header type of LINKTYPE_USER2.
-	 * If we don't have a printer for DLT_USER2, and type is
-	 * DLT_USER2, we look up the printer for DLT_PKTAP and use
-	 * that.
-	 */
-	if (type == DLT_USER2) {
-		for (p = void_printers; p->f; ++p)
-			if (DLT_PKTAP == p->type)
-				return p->f;
-	}
-#endif
-
-	return NULL;
-	/* NOTREACHED */
-}
-
-if_printer_t
-lookup_printer(netdissect_options *ndo, int type)
-{
-	if_printer_t printer;
-
-	printer.void_printer = lookup_void_printer(type);
-	ndo->ndo_void_printer = TRUE;
-	if (printer.void_printer == NULL) {
-		printer.uint_printer = lookup_uint_printer(type);
-		ndo->ndo_void_printer = FALSE;
-	}
-	return printer;
 }
 
 int
 has_printer(int type)
 {
-	return (lookup_void_printer(type) != NULL ||
-		lookup_uint_printer(type) != NULL);
+	return (lookup_printer(type) != NULL);
 }
 
-if_printer_t
-get_if_printer(netdissect_options *ndo, int type)
+if_printer
+get_if_printer(int type)
 {
-	if_printer_t printer;
+	if_printer printer;
 
-	printer = lookup_printer(ndo, type);
-	if (printer.printer == NULL)
-		printer.void_printer = unsupported_if_print;
+	printer = lookup_printer(type);
+	if (printer == NULL)
+		printer = unsupported_if_print;
 	return printer;
 }
 
@@ -391,7 +327,7 @@ void
 pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
 		    const u_char *sp, u_int packets_captured)
 {
-	u_int hdrlen;
+	u_int hdrlen = 0;
 	int invalid_header = 0;
 
 	if (ndo->ndo_packet_number)
@@ -461,19 +397,15 @@ pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
 	ndo->ndo_snapend = sp + h->caplen;
 
 	ndo->ndo_protocol = "";
-	ndo->ndo_ll_header_length = 0;
+	ndo->ndo_ll_hdr_len = 0;
 	if (setjmp(ndo->ndo_truncated) == 0) {
 		/* Print the packet. */
-		if (ndo->ndo_void_printer == TRUE) {
-			(ndo->ndo_if_printer.void_printer)(ndo, h, sp);
-			hdrlen = ndo->ndo_ll_header_length;
-		} else
-			hdrlen = (ndo->ndo_if_printer.uint_printer)(ndo, h, sp);
+		(ndo->ndo_if_printer)(ndo, h, sp);
 	} else {
 		/* A printer quit because the packet was truncated; report it */
 		ND_PRINT(" [|%s]", ndo->ndo_protocol);
-		hdrlen = ndo->ndo_ll_header_length;
 	}
+	hdrlen = ndo->ndo_ll_hdr_len;
 
 	/*
 	 * Empty the stack of packet information, freeing all pushed buffers;

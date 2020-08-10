@@ -74,8 +74,15 @@ ipoib_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 	u_int orig_length;
 	u_short ether_type;
 
-	if (caplen < IPOIB_HDRLEN || length < IPOIB_HDRLEN) {
+	if (caplen < IPOIB_HDRLEN) {
 		nd_print_trunc(ndo);
+		ndo->ndo_ll_hdr_len += caplen;
+		return;
+	}
+
+	if (length < IPOIB_HDRLEN) {
+		nd_print_trunc(ndo);
+		ndo->ndo_ll_hdr_len += length;
 		return;
 	}
 
@@ -87,6 +94,7 @@ ipoib_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 	}
 	orig_length = length;
 
+	ndo->ndo_ll_hdr_len += IPOIB_HDRLEN;
 	length -= IPOIB_HDRLEN;
 	caplen -= IPOIB_HDRLEN;
 	ether_type = GET_BE_U_2(p + 40);
@@ -111,11 +119,9 @@ ipoib_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
  * 'h->len' is the length of the packet off the wire, and 'h->caplen'
  * is the number of bytes actually captured.
  */
-u_int
+void
 ipoib_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, const u_char *p)
 {
 	ndo->ndo_protocol = "ipoib";
 	ipoib_print(ndo, p, h->len, h->caplen, NULL, NULL);
-
-	return (IPOIB_HDRLEN);
 }

@@ -151,11 +151,11 @@ ether_common_print(netdissect_options *ndo, const u_char *p, u_int length,
 
 	if (caplen < ETHER_HDRLEN + switch_tag_len) {
 		nd_print_trunc(ndo);
-		return (caplen);
+		return caplen;
 	}
 	if (length < ETHER_HDRLEN + switch_tag_len) {
 		nd_print_trunc(ndo);
-		return (length);
+		return length;
 	}
 
 	if (print_encap_header != NULL)
@@ -226,10 +226,10 @@ recurse:
 			/* Payload is encrypted; print it as raw data. */
 			if (!ndo->ndo_suppress_default_print)
 				ND_DEFAULTPRINT(p, caplen);
-			return (hdrlen);
+			return hdrlen;
 		} else if (ret > 0) {
 			/* Problem printing the header; just quit. */
-			return (ret);
+			return ret;
 		} else {
 			/*
 			 * Keep processing type/length fields.
@@ -258,12 +258,12 @@ recurse:
 		if (caplen < 4) {
 			ndo->ndo_protocol = "vlan";
 			nd_print_trunc(ndo);
-			return (hdrlen + caplen);
+			return hdrlen + caplen;
 		}
 		if (length < 4) {
 			ndo->ndo_protocol = "vlan";
 			nd_print_trunc(ndo);
-			return (hdrlen + length);
+			return hdrlen + length;
 		}
 		if (ndo->ndo_eflag) {
 			uint16_t tag = GET_BE_U_2(p);
@@ -346,11 +346,11 @@ recurse:
 	} else if (length_type == ETHERTYPE_ARISTA) {
 		if (caplen < 2) {
 			ND_PRINT("[|arista]");
-			return (hdrlen + caplen);
+			return hdrlen + caplen;
 		}
 		if (length < 2) {
 			ND_PRINT("[|arista]");
-			return (hdrlen + length);
+			return hdrlen + length;
 		}
 		ether_type_print(ndo, length_type);
 		ND_PRINT(", length %u: ", orig_length);
@@ -401,7 +401,7 @@ recurse:
 				ND_DEFAULTPRINT(p, caplen);
 		}
 	}
-	return (hdrlen);
+	return hdrlen;
 }
 
 /*
@@ -419,8 +419,8 @@ ether_switch_tag_print(netdissect_options *ndo, const u_char *p, u_int length,
     void (*print_switch_tag)(netdissect_options *, const u_char *),
     u_int switch_tag_len)
 {
-	return (ether_common_print(ndo, p, length, caplen, print_switch_tag,
-				   switch_tag_len, NULL, NULL));
+	return ether_common_print(ndo, p, length, caplen, print_switch_tag,
+				  switch_tag_len, NULL, NULL);
 }
 
 /*
@@ -438,8 +438,8 @@ ether_print(netdissect_options *ndo,
 	    const u_char *encap_header_arg)
 {
 	ndo->ndo_protocol = "ether";
-	return (ether_common_print(ndo, p, length, caplen, NULL, 0,
-				   print_encap_header, encap_header_arg));
+	return ether_common_print(ndo, p, length, caplen, NULL, 0,
+				  print_encap_header, encap_header_arg);
 }
 
 /*
@@ -448,12 +448,13 @@ ether_print(netdissect_options *ndo,
  * of the packet off the wire, and 'h->caplen' is the number
  * of bytes actually captured.
  */
-u_int
+void
 ether_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h,
 	       const u_char *p)
 {
-	ndo->ndo_protocol = "ether_if";
-	return (ether_print(ndo, p, h->len, h->caplen, NULL, NULL));
+	ndo->ndo_protocol = "ether";
+	ndo->ndo_ll_hdr_len +=
+		ether_print(ndo, p, h->len, h->caplen, NULL, NULL);
 }
 
 /*
@@ -465,21 +466,24 @@ ether_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h,
  * This is for DLT_NETANALYZER, which has a 4-byte pseudo-header
  * before the Ethernet header.
  */
-u_int
+void
 netanalyzer_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h,
 		     const u_char *p)
 {
 	/*
 	 * Fail if we don't have enough data for the Hilscher pseudo-header.
 	 */
-	ndo->ndo_protocol = "netanalyzer_if";
+	ndo->ndo_protocol = "netanalyzer";
 	if (h->caplen < 4) {
+		ndo->ndo_ll_hdr_len += h->caplen;
 		nd_print_trunc(ndo);
-		return (h->caplen);
+		return;
 	}
 
 	/* Skip the pseudo-header. */
-	return (4 + ether_print(ndo, p + 4, h->len - 4, h->caplen - 4, NULL, NULL));
+	ndo->ndo_ll_hdr_len += 4;
+	ndo->ndo_ll_hdr_len +=
+		ether_print(ndo, p + 4, h->len - 4, h->caplen - 4, NULL, NULL);
 }
 
 /*
@@ -492,7 +496,7 @@ netanalyzer_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h,
  * pseudo-header, a 7-byte Ethernet preamble, and a 1-byte Ethernet SOF
  * before the Ethernet header.
  */
-u_int
+void
 netanalyzer_transparent_if_print(netdissect_options *ndo,
 				 const struct pcap_pkthdr *h,
 				 const u_char *p)
@@ -501,14 +505,17 @@ netanalyzer_transparent_if_print(netdissect_options *ndo,
 	 * Fail if we don't have enough data for the Hilscher pseudo-header,
 	 * preamble, and SOF.
 	 */
-	ndo->ndo_protocol = "netanalyzer_transparent_if";
+	ndo->ndo_protocol = "netanalyzer_transparent";
 	if (h->caplen < 12) {
+		ndo->ndo_ll_hdr_len += h->caplen;
 		nd_print_trunc(ndo);
-		return (h->caplen);
+		return;
 	}
 
 	/* Skip the pseudo-header, preamble, and SOF. */
-	return (12 + ether_print(ndo, p + 12, h->len - 12, h->caplen - 12, NULL, NULL));
+	ndo->ndo_ll_hdr_len += 12;
+	ndo->ndo_ll_hdr_len +=
+		ether_print(ndo, p + 12, h->len - 12, h->caplen - 12, NULL, NULL);
 }
 
 /*
@@ -575,7 +582,7 @@ ethertype_print(netdissect_options *ndo,
 		return (1);
 
 	case ETHERTYPE_EAPOL:
-		eap_print(ndo, p, length);
+		eapol_print(ndo, p);
 		return (1);
 
 	case ETHERTYPE_RRCP:

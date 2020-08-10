@@ -260,7 +260,7 @@ rtcp_print(netdissect_options *ndo, const u_char *hdr, const u_char *ep)
 		ND_TCHECK_SIZE(sr);
 		ts = (double)(GET_BE_U_4(sr->sr_ntp.upper)) +
 		    ((double)(GET_BE_U_4(sr->sr_ntp.lower)) /
-		     4294967296.0);
+		     FMAXINT);
 		ND_PRINT(" @%.2f %u %up %ub", ts, GET_BE_U_4(sr->sr_ts),
 			  GET_BE_U_4(sr->sr_np), GET_BE_U_4(sr->sr_nb));
 		rr = (const struct rtcp_rr *)(sr + 1);
@@ -682,7 +682,7 @@ udp_print(netdissect_options *ndo, const u_char *bp, u_int length,
 			 IS_SRC_OR_DST_PORT(RADIUS_NEW_ACCOUNTING_PORT) ||
 			 IS_SRC_OR_DST_PORT(RADIUS_CISCO_COA_PORT) ||
 			 IS_SRC_OR_DST_PORT(RADIUS_COA_PORT) )
-			radius_print(ndo, (const u_char *)(up+1), length);
+			radius_print(ndo, cp, length);
 		else if (dport == HSRP_PORT)
 			hsrp_print(ndo, cp, length);
 		else if (IS_SRC_OR_DST_PORT(LWRES_PORT))
@@ -695,12 +695,12 @@ udp_print(netdissect_options *ndo, const u_char *bp, u_int length,
 		else if (IS_SRC_OR_DST_PORT(MPLS_LSP_PING_PORT))
 			lspping_print(ndo, cp, length);
 		else if (sport == BCM_LI_PORT)
-			bcm_li_print(ndo, (const u_char *)(up+1), length);
+			bcm_li_print(ndo, cp, length);
 		else if (dport == BFD_CONTROL_PORT ||
 			 dport == BFD_MULTIHOP_PORT ||
 			 dport == BFD_LAG_PORT ||
 			 dport == BFD_ECHO_PORT )
-			bfd_print(ndo, (const u_char *)(up+1), length, dport);
+			bfd_print(ndo, cp, length, dport);
 		else if (IS_SRC_OR_DST_PORT(LMP_PORT))
 			lmp_print(ndo, cp, length);
 		else if (IS_SRC_OR_DST_PORT(VQP_PORT))

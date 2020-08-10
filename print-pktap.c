@@ -102,14 +102,14 @@ pktap_if_print(netdissect_options *ndo,
 	uint32_t dlt, hdrlen, rectype;
 	u_int caplen = h->caplen;
 	u_int length = h->len;
-	if_printer_t printer;
+	if_printer printer;
 	const pktap_header_t *hdr;
 	struct pcap_pkthdr nhdr;
 
 	ndo->ndo_protocol = "pktap";
 	if (caplen < sizeof(pktap_header_t)) {
 		nd_print_trunc(ndo);
-		ndo->ndo_ll_header_length += caplen;
+		ndo->ndo_ll_hdr_len += caplen;
 		return;
 	}
 	hdr = (const pktap_header_t *)p;
@@ -124,12 +124,12 @@ pktap_if_print(netdissect_options *ndo,
 		 * be expanded in the future)?
 		 */
 		nd_print_trunc(ndo);
-		ndo->ndo_ll_header_length += caplen;
+		ndo->ndo_ll_hdr_len += caplen;
 		return;
 	}
 	if (caplen < hdrlen) {
 		nd_print_trunc(ndo);
-		ndo->ndo_ll_header_length += caplen;
+		ndo->ndo_ll_hdr_len += caplen;
 		return;
 	}
 
@@ -148,16 +148,13 @@ pktap_if_print(netdissect_options *ndo,
 		break;
 
 	case PKT_REC_PACKET:
-		printer = lookup_printer(ndo, dlt);
-		if (printer.printer != NULL) {
+		printer = lookup_printer(dlt);
+		if (printer != NULL) {
 			nhdr = *h;
 			nhdr.caplen = caplen;
 			nhdr.len = length;
-			if (ndo->ndo_void_printer == TRUE) {
-				printer.void_printer(ndo, &nhdr, p);
-				hdrlen += ndo->ndo_ll_header_length;
-			} else
-				hdrlen += printer.uint_printer(ndo, &nhdr, p);
+			printer(ndo, &nhdr, p);
+			hdrlen += ndo->ndo_ll_hdr_len;
 		} else {
 			if (!ndo->ndo_eflag)
 				pktap_header_print(ndo, (const u_char *)hdr,
@@ -169,7 +166,7 @@ pktap_if_print(netdissect_options *ndo,
 		break;
 	}
 
-	ndo->ndo_ll_header_length += hdrlen;
+	ndo->ndo_ll_hdr_len += hdrlen;
 	return;
 }
 #endif /* DLT_PKTAP */

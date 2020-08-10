@@ -61,6 +61,8 @@ typedef signed char nd_int8_t[1];
 typedef unsigned char nd_int32_t[4];
 typedef unsigned char nd_int64_t[8];
 
+#define	FMAXINT	(4294967296.0)	/* floating point rep. of MAXINT */
+
 /*
  * Use this for IPv4 addresses and netmasks.
  *
@@ -164,15 +166,7 @@ typedef struct netdissect_options netdissect_options;
 
 #define IF_PRINTER_ARGS (netdissect_options *, const struct pcap_pkthdr *, const u_char *)
 
-typedef u_int (*uint_if_printer) IF_PRINTER_ARGS;
-typedef void  (*void_if_printer) IF_PRINTER_ARGS;
-
-/* pointer to the uint_if_printer or the void_if_printer function */
-typedef union {
-	uint_if_printer uint_printer;
-	void_if_printer void_printer;
-	void* printer;		/* generic when testing if NULL or not */
-} if_printer_t;
+typedef void (*if_printer) IF_PRINTER_ARGS;
 
 /*
  * In case the data in a buffer needs to be processed by being decrypted,
@@ -235,7 +229,7 @@ struct netdissect_options {
   int   ndo_packettype;	/* as specified by -T */
 
   int   ndo_snaplen;
-  int   ndo_ll_header_length;	/* link-layer header length */
+  int   ndo_ll_hdr_len;	/* link-layer header length */
 
   /*global pointers to beginning and end of current packet (during printing) */
   const u_char *ndo_packetp;
@@ -244,9 +238,8 @@ struct netdissect_options {
   /* stack of saved packet boundary and buffer information */
   struct netdissect_saved_packet_info *ndo_packet_info_stack;
 
-  /* pointer to the uint_if_printer or the void_if_printer function */
-  if_printer_t ndo_if_printer;
-  int ndo_void_printer; /* void_if_printer ? (FALSE/TRUE) */
+  /* pointer to the if_printer function */
+  if_printer ndo_if_printer;
 
   /* pointer to void function to output stuff */
   void (*ndo_default_print)(netdissect_options *,
@@ -455,9 +448,7 @@ extern int unaligned_memcmp(const void *, const void *, size_t);
 extern const char *tok2strary_internal(const char **, int, const char *, int);
 #define	tok2strary(a,f,i) tok2strary_internal(a, sizeof(a)/sizeof(a[0]),f,i)
 
-extern uint_if_printer lookup_uint_printer(int);
-extern void_if_printer lookup_void_printer(int);
-extern if_printer_t lookup_printer(netdissect_options *, int);
+extern if_printer lookup_printer(int);
 
 #define ND_DEBUG {printf(" [%s:%d %s] ", __FILE__, __LINE__, __FUNCTION__); fflush(stdout);}
 
@@ -466,68 +457,67 @@ extern if_printer_t lookup_printer(netdissect_options *, int);
 extern void ap1394_if_print IF_PRINTER_ARGS;
 extern void arcnet_if_print IF_PRINTER_ARGS;
 extern void arcnet_linux_if_print IF_PRINTER_ARGS;
-extern u_int atm_if_print IF_PRINTER_ARGS;
+extern void atm_if_print IF_PRINTER_ARGS;
 extern void bt_if_print IF_PRINTER_ARGS;
-extern u_int brcm_tag_if_print IF_PRINTER_ARGS;
-extern u_int brcm_tag_prepend_if_print IF_PRINTER_ARGS;
-extern u_int chdlc_if_print IF_PRINTER_ARGS;
-extern u_int cip_if_print IF_PRINTER_ARGS;
-extern u_int dsa_if_print IF_PRINTER_ARGS;
-extern u_int edsa_if_print IF_PRINTER_ARGS;
+extern void brcm_tag_if_print IF_PRINTER_ARGS;
+extern void brcm_tag_prepend_if_print IF_PRINTER_ARGS;
+extern void chdlc_if_print IF_PRINTER_ARGS;
+extern void cip_if_print IF_PRINTER_ARGS;
+extern void dsa_if_print IF_PRINTER_ARGS;
+extern void edsa_if_print IF_PRINTER_ARGS;
 extern void enc_if_print IF_PRINTER_ARGS;
-extern u_int ether_if_print IF_PRINTER_ARGS;
-extern u_int fddi_if_print IF_PRINTER_ARGS;
-extern u_int fr_if_print IF_PRINTER_ARGS;
-extern u_int ieee802_11_if_print IF_PRINTER_ARGS;
-extern u_int ieee802_11_radio_avs_if_print IF_PRINTER_ARGS;
-extern u_int ieee802_11_radio_if_print IF_PRINTER_ARGS;
-extern u_int ieee802_15_4_if_print IF_PRINTER_ARGS;
-extern u_int ieee802_15_4_tap_if_print IF_PRINTER_ARGS;
-extern u_int ipfc_if_print IF_PRINTER_ARGS;
-extern u_int ipoib_if_print IF_PRINTER_ARGS;
+extern void ether_if_print IF_PRINTER_ARGS;
+extern void fddi_if_print IF_PRINTER_ARGS;
+extern void fr_if_print IF_PRINTER_ARGS;
+extern void ieee802_11_if_print IF_PRINTER_ARGS;
+extern void ieee802_11_radio_avs_if_print IF_PRINTER_ARGS;
+extern void ieee802_11_radio_if_print IF_PRINTER_ARGS;
+extern void ieee802_15_4_if_print IF_PRINTER_ARGS;
+extern void ieee802_15_4_tap_if_print IF_PRINTER_ARGS;
+extern void ipfc_if_print IF_PRINTER_ARGS;
+extern void ipoib_if_print IF_PRINTER_ARGS;
 extern void ipnet_if_print IF_PRINTER_ARGS;
-extern u_int juniper_atm1_if_print IF_PRINTER_ARGS;
-extern u_int juniper_atm2_if_print IF_PRINTER_ARGS;
-extern u_int juniper_chdlc_if_print IF_PRINTER_ARGS;
-extern u_int juniper_es_if_print IF_PRINTER_ARGS;
-extern u_int juniper_ether_if_print IF_PRINTER_ARGS;
-extern u_int juniper_frelay_if_print IF_PRINTER_ARGS;
-extern u_int juniper_ggsn_if_print IF_PRINTER_ARGS;
-extern u_int juniper_mfr_if_print IF_PRINTER_ARGS;
-extern u_int juniper_mlfr_if_print IF_PRINTER_ARGS;
-extern u_int juniper_mlppp_if_print IF_PRINTER_ARGS;
-extern u_int juniper_monitor_if_print IF_PRINTER_ARGS;
-extern u_int juniper_ppp_if_print IF_PRINTER_ARGS;
-extern u_int juniper_pppoe_atm_if_print IF_PRINTER_ARGS;
-extern u_int juniper_pppoe_if_print IF_PRINTER_ARGS;
-extern u_int juniper_services_if_print IF_PRINTER_ARGS;
-extern u_int lane_if_print IF_PRINTER_ARGS;
-extern u_int ltalk_if_print IF_PRINTER_ARGS;
-extern u_int mfr_if_print IF_PRINTER_ARGS;
-extern u_int netanalyzer_if_print IF_PRINTER_ARGS;
-extern u_int netanalyzer_transparent_if_print IF_PRINTER_ARGS;
+extern void juniper_atm1_if_print IF_PRINTER_ARGS;
+extern void juniper_atm2_if_print IF_PRINTER_ARGS;
+extern void juniper_chdlc_if_print IF_PRINTER_ARGS;
+extern void juniper_es_if_print IF_PRINTER_ARGS;
+extern void juniper_ether_if_print IF_PRINTER_ARGS;
+extern void juniper_frelay_if_print IF_PRINTER_ARGS;
+extern void juniper_ggsn_if_print IF_PRINTER_ARGS;
+extern void juniper_mfr_if_print IF_PRINTER_ARGS;
+extern void juniper_mlfr_if_print IF_PRINTER_ARGS;
+extern void juniper_mlppp_if_print IF_PRINTER_ARGS;
+extern void juniper_monitor_if_print IF_PRINTER_ARGS;
+extern void juniper_ppp_if_print IF_PRINTER_ARGS;
+extern void juniper_pppoe_atm_if_print IF_PRINTER_ARGS;
+extern void juniper_pppoe_if_print IF_PRINTER_ARGS;
+extern void juniper_services_if_print IF_PRINTER_ARGS;
+extern void ltalk_if_print IF_PRINTER_ARGS;
+extern void mfr_if_print IF_PRINTER_ARGS;
+extern void netanalyzer_if_print IF_PRINTER_ARGS;
+extern void netanalyzer_transparent_if_print IF_PRINTER_ARGS;
 extern void nflog_if_print IF_PRINTER_ARGS;
 extern void null_if_print IF_PRINTER_ARGS;
-extern u_int pflog_if_print IF_PRINTER_ARGS;
+extern void pflog_if_print IF_PRINTER_ARGS;
 extern void pktap_if_print IF_PRINTER_ARGS;
 extern void ppi_if_print IF_PRINTER_ARGS;
-extern u_int ppp_bsdos_if_print IF_PRINTER_ARGS;
-extern u_int ppp_hdlc_if_print IF_PRINTER_ARGS;
-extern u_int ppp_if_print IF_PRINTER_ARGS;
-extern u_int pppoe_if_print IF_PRINTER_ARGS;
-extern u_int prism_if_print IF_PRINTER_ARGS;
+extern void ppp_bsdos_if_print IF_PRINTER_ARGS;
+extern void ppp_hdlc_if_print IF_PRINTER_ARGS;
+extern void ppp_if_print IF_PRINTER_ARGS;
+extern void pppoe_if_print IF_PRINTER_ARGS;
+extern void prism_if_print IF_PRINTER_ARGS;
 extern void raw_if_print IF_PRINTER_ARGS;
 extern void sl_bsdos_if_print IF_PRINTER_ARGS;
 extern void sl_if_print IF_PRINTER_ARGS;
-extern u_int sll_if_print IF_PRINTER_ARGS;
-extern u_int sll2_if_print IF_PRINTER_ARGS;
+extern void sll_if_print IF_PRINTER_ARGS;
+extern void sll2_if_print IF_PRINTER_ARGS;
 extern void sunatm_if_print IF_PRINTER_ARGS;
 extern void symantec_if_print IF_PRINTER_ARGS;
-extern u_int token_if_print IF_PRINTER_ARGS;
+extern void token_if_print IF_PRINTER_ARGS;
 extern void unsupported_if_print IF_PRINTER_ARGS;
 extern void usb_linux_48_byte_if_print IF_PRINTER_ARGS;
 extern void usb_linux_64_byte_if_print IF_PRINTER_ARGS;
-extern u_int vsock_if_print IF_PRINTER_ARGS;
+extern void vsock_if_print IF_PRINTER_ARGS;
 
 /*
  * Structure passed to some printers to allow them to print
@@ -577,6 +567,7 @@ extern int dstopt_process(netdissect_options *, const u_char *);
 extern void dtp_print(netdissect_options *, const u_char *, u_int);
 extern void dvmrp_print(netdissect_options *, const u_char *, u_int);
 extern void eap_print(netdissect_options *, const u_char *, u_int);
+extern void eapol_print(netdissect_options *, const u_char *);
 extern void egp_print(netdissect_options *, const u_char *, u_int);
 extern void eigrp_print(netdissect_options *, const u_char *, u_int);
 extern void esp_print(netdissect_options *, const u_char *, u_int, const u_char *, u_int, int, u_int);
