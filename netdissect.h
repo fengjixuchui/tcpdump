@@ -288,12 +288,8 @@ extern void nd_pop_all_packet_info(netdissect_options *);
 #define PT_SOMEIP	19	/* Autosar SOME/IP Protocol */
 #define PT_DOMAIN	20	/* Domain Name System (DNS) */
 
-#ifndef min
-#define min(a,b) ((a)>(b)?(b):(a))
-#endif
-#ifndef max
-#define max(a,b) ((b)>(a)?(b):(a))
-#endif
+#define ND_MIN(a,b) ((a)>(b)?(b):(a))
+#define ND_MAX(a,b) ((b)>(a)?(b):(a))
 
 /* For source or destination ports tests (UDP, TCP, ...) */
 #define IS_SRC_OR_DST_PORT(p) (sport == (p) || dport == (p))
@@ -668,7 +664,7 @@ extern void rrcp_print(netdissect_options *, const u_char *, u_int, const struct
 extern void rsvp_print(netdissect_options *, const u_char *, u_int);
 extern int rt6_print(netdissect_options *, const u_char *, const u_char *);
 extern void rtsp_print(netdissect_options *, const u_char *, u_int);
-extern void rx_print(netdissect_options *, const u_char *, u_int, u_int, u_int, const u_char *);
+extern void rx_print(netdissect_options *, const u_char *, u_int, uint16_t, uint16_t, const u_char *);
 extern void sctp_print(netdissect_options *, const u_char *, const u_char *, u_int);
 extern void sflow_print(netdissect_options *, const u_char *, u_int);
 extern void ssh_print(netdissect_options *, const u_char *, u_int);
