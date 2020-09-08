@@ -78,7 +78,6 @@ dvmrp_print(netdissect_options *ndo,
 	if (bp >= ep)
 		return;
 
-	ND_TCHECK_1(bp + 1);
 	type = GET_U_1(bp + 1);
 
 	/* Skip IGMP header */
@@ -123,7 +122,6 @@ dvmrp_print(netdissect_options *ndo,
 		 * extract version from IGMP group address field
 		 */
 		bp -= 4;
-		ND_TCHECK_4(bp);
 		major_version = GET_U_1(bp + 3);
 		minor_version = GET_U_1(bp + 2);
 		bp += 4;
@@ -175,7 +173,6 @@ print_report(netdissect_options *ndo,
 			ND_PRINT(" [|]");
 			return (0);
 		}
-		ND_TCHECK_3(bp);
 		mask = (uint32_t)0xff << 24 | GET_U_1(bp) << 16 |
 			GET_U_1(bp + 1) << 8 | GET_U_1(bp + 2);
 		width = 1;
@@ -200,14 +197,12 @@ print_report(netdissect_options *ndo,
 			}
 			origin = 0;
 			for (i = 0; i < width; ++i) {
-				ND_TCHECK_1(bp);
 				origin = origin << 8 | GET_U_1(bp);
 				bp++;
 			}
 			for ( ; i < 4; ++i)
 				origin <<= 8;
 
-			ND_TCHECK_1(bp);
 			metric = GET_U_1(bp);
 			bp++;
 			done = metric & 0x80;
@@ -218,8 +213,6 @@ print_report(netdissect_options *ndo,
 		} while (!done);
 	}
 	return (0);
-trunc:
-	return (-1);
 }
 
 static int
@@ -345,34 +338,25 @@ static int
 print_prune(netdissect_options *ndo,
             const u_char *bp)
 {
-	ND_TCHECK_LEN(bp, 12);
 	ND_PRINT(" src %s grp %s", GET_IPADDR_STRING(bp), GET_IPADDR_STRING(bp + 4));
 	bp += 8;
 	ND_PRINT(" timer ");
 	unsigned_relts_print(ndo, GET_BE_U_4(bp));
 	return (0);
-trunc:
-	return (-1);
 }
 
 static int
 print_graft(netdissect_options *ndo,
             const u_char *bp)
 {
-	ND_TCHECK_8(bp);
 	ND_PRINT(" src %s grp %s", GET_IPADDR_STRING(bp), GET_IPADDR_STRING(bp + 4));
 	return (0);
-trunc:
-	return (-1);
 }
 
 static int
 print_graft_ack(netdissect_options *ndo,
                 const u_char *bp)
 {
-	ND_TCHECK_8(bp);
 	ND_PRINT(" src %s grp %s", GET_IPADDR_STRING(bp), GET_IPADDR_STRING(bp + 4));
 	return (0);
-trunc:
-	return (-1);
 }

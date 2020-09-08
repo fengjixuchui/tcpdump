@@ -252,16 +252,12 @@ static void dccp_print_ack_no(netdissect_options *ndo, const u_char *bp)
 	uint64_t ackno;
 
 	if (DCCPH_X(dh) != 0) {
-		ND_TCHECK_8(ackp);
 		ackno = GET_BE_U_6(ackp + 2);
 	} else {
-		ND_TCHECK_4(ackp);
 		ackno = GET_BE_U_3(ackp + 1);
 	}
 
 	ND_PRINT("(ack=%" PRIu64 ") ", ackno);
-trunc:
-	return;
 }
 
 static u_int dccp_print_option(netdissect_options *, const u_char *, u_int);
@@ -542,10 +538,7 @@ dccp_print_option(netdissect_options *ndo, const u_char *option, u_int hlen)
 {
 	uint8_t optlen, i;
 
-	ND_TCHECK_1(option);
-
 	if (GET_U_1(option) >= 32) {
-		ND_TCHECK_1(option + 1);
 		optlen = GET_U_1(option + 1);
 		if (optlen < 2) {
 			if (GET_U_1(option) >= 128)

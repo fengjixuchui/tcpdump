@@ -613,7 +613,6 @@ frf15_print(netdissect_options *ndo,
 
     if (length < 2)
         goto trunc;
-    ND_TCHECK_2(p);
 
     flags = GET_U_1(p)&MFR_BEC_MASK;
     sequence_num = (GET_U_1(p)&0x1e)<<7 | GET_U_1(p + 1);
@@ -629,7 +628,7 @@ frf15_print(netdissect_options *ndo,
  * dig as deep as we can - e.g. on the first (B) fragment
  * there is enough payload to print the IP header
  * on non (B) fragments it depends if the fragmentation
- * model is end-to-end or interface based wether we want to print
+ * model is end-to-end or interface based whether we want to print
  * another Q.922 header
  */
     return;
@@ -919,7 +918,6 @@ q933_print(netdissect_options *ndo,
 	ND_PRINT("%s, codeset %u", is_ansi ? "ANSI" : "CCITT", codeset);
 
 	if (call_ref_length != 0) {
-		ND_TCHECK_1(p);
 		if (call_ref_length > 1 || GET_U_1(p) != 0) {
 			/*
 			 * Not a dummy call reference.
