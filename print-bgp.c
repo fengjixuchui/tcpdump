@@ -684,7 +684,6 @@ bgp_vpn_ip_print(netdissect_options *ndo,
 
     switch(addr_length) {
     case (sizeof(nd_ipv4) << 3): /* 32 */
-        ND_TCHECK_LEN(pptr, sizeof(nd_ipv4));
         snprintf(pos, sizeof(addr), "%s", GET_IPADDR_STRING(pptr));
         break;
     case (sizeof(nd_ipv6) << 3): /* 128 */
@@ -696,7 +695,6 @@ bgp_vpn_ip_print(netdissect_options *ndo,
     }
     pos += strlen(pos);
 
-trunc:
     *(pos) = '\0';
     return (addr);
 }
@@ -1116,13 +1114,10 @@ decode_mdt_vpn_nlri(netdissect_options *ndo,
     pptr += 8;
 
     /* IPv4 address */
-    ND_TCHECK_LEN(pptr, sizeof(nd_ipv4));
     vpn_ip = pptr;
     pptr += sizeof(nd_ipv4);
 
     /* MDT Group Address */
-    ND_TCHECK_LEN(pptr, sizeof(nd_ipv4));
-
     snprintf(buf, buflen, "RD: %s, VPN IP Address: %s, MC Group Address: %s",
                 bgp_vpn_rd_print(ndo, rd), GET_IPADDR_STRING(vpn_ip), GET_IPADDR_STRING(pptr));
 
@@ -1980,7 +1975,6 @@ bgp_attr_print(netdissect_options *ndo,
         if (len != 4)
             ND_PRINT("invalid len");
         else {
-            ND_TCHECK_4(tptr);
             ND_PRINT("%s", GET_IPADDR_STRING(tptr));
         }
         break;
@@ -2063,7 +2057,6 @@ bgp_attr_print(netdissect_options *ndo,
             ND_PRINT("invalid len");
             break;
         }
-        ND_TCHECK_4(tptr);
         ND_PRINT("%s",GET_IPADDR_STRING(tptr));
         break;
     case BGPTYPE_CLUSTER_LIST:
@@ -2072,7 +2065,6 @@ bgp_attr_print(netdissect_options *ndo,
             break;
         }
         while (tlen != 0) {
-            ND_TCHECK_4(tptr);
             if (tlen < 4)
                 goto trunc;
             ND_PRINT("%s%s",
@@ -2126,7 +2118,6 @@ bgp_attr_print(netdissect_options *ndo,
                         tlen -= tnhlen;
                         tnhlen = 0;
                     } else {
-                        ND_TCHECK_LEN(tptr, sizeof(nd_ipv4));
                         ND_PRINT("%s",GET_IPADDR_STRING(tptr));
                         tptr += sizeof(nd_ipv4);
                         tnhlen -= sizeof(nd_ipv4);
@@ -2142,8 +2133,6 @@ bgp_attr_print(netdissect_options *ndo,
                         tlen -= tnhlen;
                         tnhlen = 0;
                     } else {
-                        ND_TCHECK_LEN(tptr,
-                                      sizeof(nd_ipv4) + BGP_VPN_RD_LEN);
                         ND_PRINT("RD: %s, %s",
                                   bgp_vpn_rd_print(ndo, tptr),
                                   GET_IPADDR_STRING(tptr+BGP_VPN_RD_LEN));
@@ -2195,7 +2184,6 @@ bgp_attr_print(netdissect_options *ndo,
                         tlen -= tnhlen;
                         tnhlen = 0;
                     } else {
-                        ND_TCHECK_LEN(tptr, sizeof(nd_ipv4));
                         ND_PRINT("%s", GET_IPADDR_STRING(tptr));
                         tptr += (sizeof(nd_ipv4));
                         tlen -= (sizeof(nd_ipv4));
@@ -2205,7 +2193,6 @@ bgp_attr_print(netdissect_options *ndo,
                 case (AFNUM_NSAP<<8 | SAFNUM_UNICAST):
                 case (AFNUM_NSAP<<8 | SAFNUM_MULTICAST):
                 case (AFNUM_NSAP<<8 | SAFNUM_UNIMULTICAST):
-                    ND_TCHECK_LEN(tptr, tnhlen);
                     ND_PRINT("%s", GET_ISONSAP_STRING(tptr, tnhlen));
                     tptr += tnhlen;
                     tlen -= tnhlen;
@@ -2382,7 +2369,6 @@ bgp_attr_print(netdissect_options *ndo,
                       GET_IPADDR_STRING(tptr+4));
             break;
         case BGP_PMSI_TUNNEL_INGRESS:
-            ND_TCHECK_4(tptr);
             ND_PRINT("\n\t      Tunnel-Endpoint %s",
                       GET_IPADDR_STRING(tptr));
             break;

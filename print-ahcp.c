@@ -171,7 +171,6 @@ ahcp_ipv4_addresses_print(netdissect_options *ndo, const u_char *cp, const u_cha
 	while (cp < ep) {
 		if (cp + 4 > ep)
 			goto invalid;
-		ND_TCHECK_4(cp);
 		ND_PRINT("%s%s", sep, GET_IPADDR_STRING(cp));
 		cp += 4;
 		sep = ", ";
@@ -374,11 +373,9 @@ ahcp_print(netdissect_options *ndo, const u_char *cp, const u_int len)
 				ND_PRINT(", Nonce 0x%08x", GET_BE_U_4(cp));
 				cp += 4;
 				/* Source Id */
-				ND_TCHECK_8(cp);
 				ND_PRINT(", Source Id %s", GET_LINKADDR_STRING(cp, LINKADDR_OTHER, 8));
 				cp += 8;
 				/* Destination Id */
-				ND_TCHECK_8(cp);
 				ND_PRINT(", Destination Id %s", GET_LINKADDR_STRING(cp, LINKADDR_OTHER, 8));
 				cp += 8;
 			}

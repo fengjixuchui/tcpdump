@@ -189,7 +189,6 @@ pimv1_join_prune_print(netdissect_options *ndo,
 
 	if (len < sizeof(nd_ipv4))
 		goto trunc;
-	ND_TCHECK_LEN(bp, sizeof(nd_ipv4));
 	if (ndo->ndo_vflag > 1)
 		ND_PRINT("\n");
 	ND_PRINT(" Upstream Nbr: %s", GET_IPADDR_STRING(bp));
@@ -218,13 +217,11 @@ pimv1_join_prune_print(netdissect_options *ndo,
 		 */
 		if (len < 4)
 			goto trunc;
-		ND_TCHECK_LEN(bp, sizeof(nd_ipv4));
 		ND_PRINT("\n\tGroup: %s", GET_IPADDR_STRING(bp));
 		bp += 4;
 		len -= 4;
 		if (len < 4)
 			goto trunc;
-		ND_TCHECK_LEN(bp, sizeof(nd_ipv4));
 		if (GET_BE_U_4(bp) != 0xffffffff)
 			ND_PRINT("/%s", GET_IPADDR_STRING(bp));
 		bp += 4;
@@ -303,7 +300,6 @@ pimv1_print(netdissect_options *ndo,
 			  GET_IPADDR_STRING(bp + 24));
 		break;
 	case PIMV1_TYPE_REGISTER_STOP:
-		ND_TCHECK_LEN(bp + 12, sizeof(nd_ipv4));
 		ND_PRINT(" for %s > %s", GET_IPADDR_STRING(bp + 8),
 			  GET_IPADDR_STRING(bp + 12));
 		break;
@@ -318,7 +314,6 @@ pimv1_print(netdissect_options *ndo,
 		}
 		break;
 	case PIMV1_TYPE_ASSERT:
-		ND_TCHECK_LEN(bp + 16, sizeof(nd_ipv4));
 		ND_PRINT(" for %s > %s", GET_IPADDR_STRING(bp + 16),
 			  GET_IPADDR_STRING(bp + 8));
 		if (GET_BE_U_4(bp + 12) != 0xffffffff)
@@ -410,7 +405,6 @@ cisco_autorp_print(netdissect_options *ndo,
 
 		if (len < 4)
 			goto trunc;
-		ND_TCHECK_4(bp);
 		ND_PRINT(" RP %s", GET_IPADDR_STRING(bp));
 		bp += 4;
 		len -= 4;
@@ -468,9 +462,6 @@ pim_print(netdissect_options *ndo,
 	uint8_t pim_typever;
 
 	ndo->ndo_protocol = "pim";
-#ifdef notyet			/* currently we see only version and type */
-	ND_TCHECK_1(pim->pim_rsv);
-#endif
 
 	pim_typever = GET_U_1(pim->pim_typever);
 	switch (PIM_VER(pim_typever)) {
@@ -913,7 +904,6 @@ pimv2_print(netdissect_options *ndo,
 		ip = (const struct ip *)bp;
 		switch (IP_V(ip)) {
                 case 0: /* Null header */
-			ND_TCHECK_4(ip->ip_dst);
 			ND_PRINT("IP-Null-header %s > %s",
 			          GET_IPADDR_STRING(ip->ip_src),
 			          GET_IPADDR_STRING(ip->ip_dst));
