@@ -71,11 +71,15 @@ ip_printroute(netdissect_options *ndo,
 		ND_PRINT(" [bad ptr %u]", GET_U_1(cp + 2));
 
 	for (len = 3; len < length; len += 4) {
+		ND_TCHECK_4(cp + len);	/* Needed to print the IP addresses */
 		ND_PRINT(" %s", GET_IPADDR_STRING(cp + len));
 		if (ptr > len)
 			ND_PRINT(",");
 	}
 	return (0);
+
+trunc:
+	return (-1);
 }
 
 /*
@@ -190,16 +194,7 @@ ip_printts(netdissect_options *ndo,
 	case IPOPT_TS_TSANDADDR:
 		ND_PRINT("TS+ADDR");
 		break;
-	/*
-	 * prespecified should really be 3, but some ones might send 2
-	 * instead, and the IPOPT_TS_PRESPEC constant can apparently
-	 * have both values, so we have to hard-code it here.
-	 */
-
-	case 2:
-		ND_PRINT("PRESPEC2.0");
-		break;
-	case 3:			/* IPOPT_TS_PRESPEC */
+	case IPOPT_TS_PRESPEC:
 		ND_PRINT("PRESPEC");
 		break;
 	default:

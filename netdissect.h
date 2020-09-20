@@ -194,6 +194,9 @@ struct netdissect_saved_packet_info {
   struct netdissect_saved_packet_info *ndspi_prev;	/* previous buffer on the stack */
 };
 
+/* 'val' value(s) for longjmp */
+#define ND_TRUNCATED 1
+
 struct netdissect_options {
   int ndo_bflag;		/* print 4 byte ASes in ASDOT notation */
   int ndo_eflag;		/* print ethernet header */
@@ -213,7 +216,7 @@ struct netdissect_options {
 				 */
   int ndo_Hflag;		/* dissect 802.11s draft mesh standard */
   const char *ndo_protocol;	/* protocol */
-  jmp_buf ndo_truncated;	/* jmp_buf for setjmp()/longjmp() */
+  jmp_buf ndo_early_end;	/* jmp_buf for setjmp()/longjmp() */
   void *ndo_last_mem_p;		/* pointer to the last allocated memory chunk */
   int ndo_packet_number;	/* print a packet number in the beginning of line */
   int ndo_suppress_default_print; /* don't use default_print() for unknown packet types */
@@ -534,7 +537,7 @@ struct lladdr_info {
 
 extern void aarp_print(netdissect_options *, const u_char *, u_int);
 extern int ah_print(netdissect_options *, const u_char *);
-extern void ahcp_print(netdissect_options *, const u_char *, const u_int);
+extern void ahcp_print(netdissect_options *, const u_char *, u_int);
 extern void aodv_print(netdissect_options *, const u_char *, u_int, int);
 extern void aoe_print(netdissect_options *, const u_char *, const u_int);
 extern int  arista_ethertype_print(netdissect_options *,const u_char *, u_int);
@@ -609,7 +612,7 @@ extern u_int llap_print(netdissect_options *, const u_char *, u_int);
 extern int llc_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
 extern void lldp_print(netdissect_options *, const u_char *, u_int);
 extern void lmp_print(netdissect_options *, const u_char *, u_int);
-extern void loopback_print(netdissect_options *, const u_char *, const u_int);
+extern void loopback_print(netdissect_options *, const u_char *, u_int);
 extern void lspping_print(netdissect_options *, const u_char *, u_int);
 extern void lwapp_control_print(netdissect_options *, const u_char *, u_int, int);
 extern void lwapp_data_print(netdissect_options *, const u_char *, u_int);
