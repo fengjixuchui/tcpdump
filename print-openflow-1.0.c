@@ -6,17 +6,18 @@
  * up bogus values of selected message fields and decodes partially captured
  * messages up to the snapshot end. It is based on the specification below:
  *
- * [OF10] https://web.archive.org/web/20160402132157/http://archive.openflow.org/documents/openflow-spec-v1.0.0.pdf
+ * [OF10] https://www.opennetworking.org/wp-content/uploads/2013/04/openflow-spec-v1.0.0.pdf
  *
- * Most functions in this file take 3 arguments into account:
+ * Most functions in this file take the following arguments:
  * * cp -- the pointer to the first octet to decode
- * * len -- the length of the current structure as declared on the wire
- * * ep -- the pointer to the end of the captured frame
- * They return either the pointer to the next not-yet-decoded part of the frame
- * or the value of ep, which means the current frame processing is over as it
- * has been fully decoded or is invalid or truncated. This way it is possible
- * to chain and nest such functions uniformly to decode an OF1.0 message, which
- * consists of several layers of nested structures.
+ * * len -- the declared length of the structure to decode
+ * The convention is that a printer function returns iff the given structure is
+ * completely within the packet buffer; otherwise it processes the part that is
+ * within the buffer, sooner of later takes the "truncated packet" shortcut via
+ * longjmp() and never returns. With that in mind, the function may return
+ * without printing the structure completely if it is invalid or the ndo_vflag
+ * value is not high enough. This way the calling function can try to decode
+ * the next data item.
  *
  * Decoding of Ethernet frames nested in OFPT_PACKET_IN and OFPT_PACKET_OUT
  * messages is done only when the verbosity level set by command-line argument
@@ -64,6 +65,7 @@
 
 #include "netdissect-stdinc.h"
 
+#define ND_LONGJMP_FROM_TCHECK
 #include "netdissect.h"
 #include "extract.h"
 #include "addrtoname.h"
@@ -454,6 +456,7 @@ static const struct tok ofpet_str[] = {
 	{ OFPET_QUEUE_OP_FAILED, "QUEUE_OP_FAILED" },
 	{ 0, NULL }
 };
+#define OFPET_MAX OFPET_QUEUE_OP_FAILED /* for of10_error_print() */
 
 #define OFPHFC_INCOMPATIBLE 0x0000U
 #define OFPHFC_EPERM        0x0001U
@@ -541,50 +544,36 @@ static const struct tok ofpqofc_str[] = {
 	{ 0, NULL }
 };
 
-static const struct tok empty_str[] = {
-	{ 0, NULL }
-};
-
 /* lengths (fixed or minimal) of particular protocol structures */
-#define OF_SWITCH_CONFIG_LEN              12
-#define OF_PHY_PORT_LEN                   48
-#define OF_SWITCH_FEATURES_LEN            32
-#define OF_PORT_STATUS_LEN                64
-#define OF_PORT_MOD_LEN                   32
-#define OF_PACKET_IN_LEN                  20
-#define OF_ACTION_OUTPUT_LEN               8
-#define OF_ACTION_VLAN_VID_LEN             8
-#define OF_ACTION_VLAN_PCP_LEN             8
-#define OF_ACTION_DL_ADDR_LEN             16
-#define OF_ACTION_NW_ADDR_LEN              8
-#define OF_ACTION_TP_PORT_LEN              8
-#define OF_ACTION_NW_TOS_LEN               8
-#define OF_ACTION_VENDOR_HEADER_LEN        8
-#define OF_ACTION_HEADER_LEN               8
-#define OF_PACKET_OUT_LEN                 16
-#define OF_MATCH_LEN                      40
-#define OF_FLOW_MOD_LEN                   72
-#define OF_FLOW_REMOVED_LEN               88
-#define OF_ERROR_MSG_LEN                  12
-#define OF_STATS_REQUEST_LEN              12
-#define OF_STATS_REPLY_LEN                12
-#define OF_DESC_STATS_LEN               1056
-#define OF_FLOW_STATS_REQUEST_LEN         44
-#define OF_FLOW_STATS_LEN                 88
-#define OF_AGGREGATE_STATS_REQUEST_LEN    44
-#define OF_AGGREGATE_STATS_REPLY_LEN      24
-#define OF_TABLE_STATS_LEN                64
-#define OF_PORT_STATS_REQUEST_LEN          8
-#define OF_PORT_STATS_LEN                104
-#define OF_VENDOR_HEADER_LEN              12
-#define OF_QUEUE_PROP_HEADER_LEN           8
-#define OF_QUEUE_PROP_MIN_RATE_LEN        16
-#define OF_PACKET_QUEUE_LEN                8
-#define OF_QUEUE_GET_CONFIG_REQUEST_LEN   12
-#define OF_QUEUE_GET_CONFIG_REPLY_LEN     16
-#define OF_ACTION_ENQUEUE_LEN             16
-#define OF_QUEUE_STATS_REQUEST_LEN         8
-#define OF_QUEUE_STATS_LEN                32
+#define OF_SWITCH_CONFIG_FIXLEN               12
+#define OF_PHY_PORT_FIXLEN                    48
+#define OF_FEATURES_REPLY_MINLEN              32
+#define OF_PORT_STATUS_FIXLEN                 64
+#define OF_PORT_MOD_FIXLEN                    32
+#define OF_PACKET_IN_MINLEN                   20 /* with 2 mock octets */
+#define OF_ACTION_MINLEN                       8
+#define OF_PACKET_OUT_MINLEN                  16
+#define OF_MATCH_FIXLEN                       40
+#define OF_FLOW_MOD_MINLEN                    72
+#define OF_FLOW_REMOVED_FIXLEN                88
+#define OF_ERROR_MSG_MINLEN                   12
+#define OF_STATS_REQUEST_MINLEN               12
+#define OF_STATS_REPLY_MINLEN                 12
+#define OF_DESC_STATS_REPLY_FIXLEN          1056
+#define OF_FLOW_STATS_REQUEST_FIXLEN          44
+#define OF_FLOW_STATS_REPLY_MINLEN            88
+#define OF_AGGREGATE_STATS_REPLY_FIXLEN       24
+#define OF_TABLE_STATS_REPLY_FIXLEN           64
+#define OF_PORT_STATS_REQUEST_FIXLEN           8
+#define OF_PORT_STATS_REPLY_FIXLEN           104
+#define OF_VENDOR_MINLEN                      12
+#define OF_QUEUE_PROP_MINLEN                   8
+#define OF_QUEUE_PROP_MIN_RATE_FIXLEN         16
+#define OF_PACKET_QUEUE_MINLEN                 8
+#define OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN    12
+#define OF_QUEUE_GET_CONFIG_REPLY_MINLEN      16
+#define OF_QUEUE_STATS_REQUEST_FIXLEN          8
+#define OF_QUEUE_STATS_REPLY_FIXLEN           32
 
 /* miscellaneous constants from [OF10] */
 #define OFP_MAX_TABLE_NAME_LEN     32
@@ -693,6 +682,12 @@ static const struct tok bsn_onoff_str[] = {
 	{ 0, NULL },
 };
 
+/* [OF10] Section 5.1 */
+const char * of10_msgtype_str(const uint8_t type)
+{
+	return tok2str(ofpt_str, "invalid (0x%02x)", type);
+}
+
 static const char *
 vlan_str(const uint16_t vid)
 {
@@ -729,39 +724,20 @@ of10_bitmap_print(netdissect_options *ndo,
 			sep = ", ";
 		}
 	/* unassigned bits? */
-	ND_PRINT(v & u ? ") (bogus)" : ")");
+	ND_PRINT((v & u) ? ") (bogus)" : ")");
 }
 
-static const u_char *
-of10_data_print(netdissect_options *ndo,
-                const u_char *cp, const u_char *ep, const u_int len)
-{
-	if (len == 0)
-		return cp;
-	/* data */
-	ND_PRINT("\n\t data (%u octets)", len);
-	ND_TCHECK_LEN(cp, len);
-	if (ndo->ndo_vflag >= 2)
-		hex_and_ascii_print(ndo, "\n\t  ", cp, len);
-	return cp + len;
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
-}
-
-static const u_char *
+static void
 of10_bsn_message_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const u_int len)
+                       const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
 	uint32_t subtype;
 
 	if (len < 4)
 		goto invalid;
 	/* subtype */
 	subtype = GET_BE_U_4(cp);
-	cp += 4;
+	OF_FWD(4);
 	ND_PRINT("\n\t subtype %s", tok2str(bsn_subtype_str, "unknown (0x%08x)", subtype));
 	switch (subtype) {
 	case BSN_GET_IP_MASK_REQUEST:
@@ -777,14 +753,14 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 12)
+		if (len != 8)
 			goto invalid;
 		/* index */
 		ND_PRINT(", index %u", GET_U_1(cp));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
+		/* Always the last field, check bounds. */
 		ND_TCHECK_7(cp);
-		cp += 7;
 		break;
 	case BSN_SET_IP_MASK:
 	case BSN_GET_IP_MASK_REPLY:
@@ -800,16 +776,15 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 12)
+		if (len != 8)
 			goto invalid;
 		/* index */
 		ND_PRINT(", index %u", GET_U_1(cp));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
-		cp += 3;
+		OF_FWD(3);
 		/* mask */
 		ND_PRINT(", mask %s", GET_IPADDR_STRING(cp));
-		cp += 4;
 		break;
 	case BSN_SET_MIRRORING:
 	case BSN_GET_MIRRORING_REQUEST:
@@ -824,15 +799,15 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 8)
+		if (len != 4)
 			goto invalid;
 		/* report_mirror_ports */
 		ND_PRINT(", report_mirror_ports %s",
 			 tok2str(bsn_onoff_str, "bogus (%u)", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
+		/* Always the last field, check bounds. */
 		ND_TCHECK_3(cp);
-		cp += 3;
 		break;
 	case BSN_GET_INTERFACES_REQUEST:
 	case BSN_GET_L2_TABLE_REQUEST:
@@ -847,7 +822,7 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 4)
+		if (len)
 			goto invalid;
 		break;
 	case BSN_VIRTUAL_PORT_REMOVE_REQUEST:
@@ -861,11 +836,10 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 8)
+		if (len != 4)
 			goto invalid;
 		/* vport_no */
 		ND_PRINT(", vport_no %u", GET_BE_U_4(cp));
-		cp += 4;
 		break;
 	case BSN_SHELL_COMMAND:
 		/*
@@ -880,19 +854,15 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+--------
 		 *
 		 */
-		if (len < 8)
+		if (len < 4)
 			goto invalid;
 		/* service */
 		ND_PRINT(", service %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* data */
 		ND_PRINT(", data '");
-		if (nd_printn(ndo, cp, len - 8, ep)) {
-			ND_PRINT("'");
-			goto trunc;
-		}
+		nd_printn(ndo, cp, len, NULL);
 		ND_PRINT("'");
-		cp += len - 8;
 		break;
 	case BSN_SHELL_OUTPUT:
 		/*
@@ -908,12 +878,8 @@ of10_bsn_message_print(netdissect_options *ndo,
 		/* already checked that len >= 4 */
 		/* data */
 		ND_PRINT(", data '");
-		if (nd_printn(ndo, cp, len - 4, ep)) {
-			ND_PRINT("'");
-			goto trunc;
-		}
+		nd_printn(ndo, cp, len, NULL);
 		ND_PRINT("'");
-		cp += len - 4;
 		break;
 	case BSN_SHELL_STATUS:
 		/*
@@ -926,39 +892,32 @@ of10_bsn_message_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 8)
+		if (len != 4)
 			goto invalid;
 		/* status */
 		ND_PRINT(", status 0x%08x", GET_BE_U_4(cp));
-		cp += 4;
 		break;
 	default:
-		ND_TCHECK_LEN(cp, len - 4);
-		cp += len - 4;
+		ND_TCHECK_LEN(cp, len);
 	}
-	return cp;
+	return;
 
 invalid: /* skip the undersized data */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len);
-	return cp0 + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
-static const u_char *
+static void
 of10_bsn_actions_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const u_int len)
+                       const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
 	uint32_t subtype, vlan_tag;
 
 	if (len < 4)
 		goto invalid;
 	/* subtype */
 	subtype = GET_BE_U_4(cp);
-	cp += 4;
+	OF_FWD(4);
 	ND_PRINT("\n\t  subtype %s", tok2str(bsn_action_subtype_str, "unknown (0x%08x)", subtype));
 	switch (subtype) {
 	case BSN_ACTION_MIRROR:
@@ -976,14 +935,14 @@ of10_bsn_actions_print(netdissect_options *ndo,
 		 * +---------------+---------------+---------------+---------------+
 		 *
 		 */
-		if (len != 16)
+		if (len != 12)
 			goto invalid;
 		/* dest_port */
 		ND_PRINT(", dest_port %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* vlan_tag */
 		vlan_tag = GET_BE_U_4(cp);
-		cp += 4;
+		OF_FWD(4);
 		switch (vlan_tag >> 16) {
 		case 0:
 			ND_PRINT(", vlan_tag none");
@@ -997,87 +956,75 @@ of10_bsn_actions_print(netdissect_options *ndo,
 		/* copy_stage */
 		ND_PRINT(", copy_stage %s",
 			 tok2str(bsn_mirror_copy_stage_str, "unknown (%u)", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
+		/* Always the last field, check bounds. */
 		ND_TCHECK_3(cp);
-		cp += 3;
 		break;
 	default:
-		ND_TCHECK_LEN(cp, len - 4);
-		cp += len - 4;
+		ND_TCHECK_LEN(cp, len);
 	}
-
-	return cp;
+	return;
 
 invalid:
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len);
-	return cp0 + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
-static const u_char *
+static void
 of10_vendor_action_print(netdissect_options *ndo,
-                         const u_char *cp, const u_char *ep, const u_int len)
+                         const u_char *cp, u_int len)
 {
 	uint32_t vendor;
-	const u_char *(*decoder)(netdissect_options *, const u_char *, const u_char *, const u_int);
+	void (*decoder)(netdissect_options *, const u_char *, u_int);
 
 	if (len < 4)
 		goto invalid;
 	/* vendor */
 	vendor = GET_BE_U_4(cp);
-	cp += 4;
+	OF_FWD(4);
 	ND_PRINT(", vendor 0x%08x (%s)", vendor, of_vendor_name(vendor));
 	/* data */
 	decoder =
 		vendor == OUI_BSN         ? of10_bsn_actions_print         :
-		of10_data_print;
-	return decoder(ndo, cp, ep, len - 4);
+		of_data_print;
+	decoder(ndo, cp, len);
+	return;
 
 invalid: /* skip the undersized data */
 	nd_print_invalid(ndo);
 	ND_TCHECK_LEN(cp, len);
-	return cp + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
-static const u_char *
+static void
 of10_vendor_message_print(netdissect_options *ndo,
-                          const u_char *cp, const u_char *ep, const u_int len)
+                          const u_char *cp, u_int len)
 {
 	uint32_t vendor;
-	const u_char *(*decoder)(netdissect_options *, const u_char *, const u_char *, u_int);
+	void (*decoder)(netdissect_options *, const u_char *, u_int);
 
 	if (len < 4)
 		goto invalid;
 	/* vendor */
 	vendor = GET_BE_U_4(cp);
-	cp += 4;
+	OF_FWD(4);
 	ND_PRINT(", vendor 0x%08x (%s)", vendor, of_vendor_name(vendor));
 	/* data */
 	decoder =
 		vendor == OUI_BSN         ? of10_bsn_message_print         :
-		of10_data_print;
-	return decoder(ndo, cp, ep, len - 4);
+		of_data_print;
+	decoder(ndo, cp, len);
+	return;
 
 invalid: /* skip the undersized data */
 	nd_print_invalid(ndo);
 	ND_TCHECK_LEN(cp, len);
-	return cp + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
 /* Vendor ID is mandatory, data is optional. */
-static const u_char *
+static void
 of10_vendor_data_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const u_int len)
+                       const u_char *cp, u_int len)
 {
 	uint32_t vendor;
 
@@ -1085,143 +1032,123 @@ of10_vendor_data_print(netdissect_options *ndo,
 		goto invalid;
 	/* vendor */
 	vendor = GET_BE_U_4(cp);
-	cp += 4;
+	OF_FWD(4);
 	ND_PRINT(", vendor 0x%08x (%s)", vendor, of_vendor_name(vendor));
 	/* data */
-	return of10_data_print(ndo, cp, ep, len - 4);
+	of_data_print(ndo, cp, len);
+	return;
 
 invalid: /* skip the undersized data */
 	nd_print_invalid(ndo);
 	ND_TCHECK_LEN(cp, len);
-	return cp + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
-static const u_char *
+static void
 of10_packet_data_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const u_int len)
+                       const u_char *cp, const u_int len)
 {
 	if (len == 0)
-		return cp;
+		return;
 	/* data */
 	ND_PRINT("\n\t data (%u octets)", len);
-	if (ndo->ndo_vflag < 3)
-		return cp + len;
-	ND_TCHECK_LEN(cp, len);
+	if (ndo->ndo_vflag < 3) {
+		ND_TCHECK_LEN(cp, len);
+		return;
+	}
 	ndo->ndo_vflag -= 3;
 	ND_PRINT(", frame decoding below\n");
 	ether_print(ndo, cp, len, ND_BYTES_AVAILABLE_AFTER(cp), NULL, NULL);
 	ndo->ndo_vflag += 3;
-	return cp + len;
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
 /* [OF10] Section 5.2.1 */
-static const u_char *
+static void
 of10_phy_ports_print(netdissect_options *ndo,
-                     const u_char *cp, const u_char *ep, u_int len)
+                     const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-
 	while (len) {
-		if (len < OF_PHY_PORT_LEN)
+		if (len < OF_PHY_PORT_FIXLEN)
 			goto invalid;
 		/* port_no */
 		ND_PRINT("\n\t  port_no %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* hw_addr */
 		ND_PRINT(", hw_addr %s", GET_ETHERADDR_STRING(cp));
-		cp += MAC_ADDR_LEN;
+		OF_FWD(MAC_ADDR_LEN);
 		/* name */
 		ND_PRINT(", name '");
 		(void)nd_print(ndo, cp, cp + OFP_MAX_PORT_NAME_LEN);
 		ND_PRINT("'");
-		cp += OFP_MAX_PORT_NAME_LEN;
+		OF_FWD(OFP_MAX_PORT_NAME_LEN);
 
 		if (ndo->ndo_vflag < 2) {
-			ND_TCHECK_LEN(cp, 24);
-			cp += 24;
-			goto next_port;
+			OF_CHK_FWD(24);
+			continue;
 		}
 		/* config */
 		ND_PRINT("\n\t   config 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
-		cp += 4;
+		OF_FWD(4);
 		/* state */
 		ND_PRINT("\n\t   state 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofpps_bm, GET_BE_U_4(cp), OFPPS_U);
-		cp += 4;
+		OF_FWD(4);
 		/* curr */
 		ND_PRINT("\n\t   curr 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		cp += 4;
+		OF_FWD(4);
 		/* advertised */
 		ND_PRINT("\n\t   advertised 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		cp += 4;
+		OF_FWD(4);
 		/* supported */
 		ND_PRINT("\n\t   supported 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		cp += 4;
+		OF_FWD(4);
 		/* peer */
 		ND_PRINT("\n\t   peer 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		cp += 4;
-next_port:
-		len -= OF_PHY_PORT_LEN;
+		OF_FWD(4);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the undersized trailing data */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* [OF10] Section 5.2.2 */
-static const u_char *
+static void
 of10_queue_props_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, u_int len)
+                       const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-	uint16_t property, plen, rate;
-
 	while (len) {
+		uint16_t property, plen;
 		u_char plen_bogus = 0, skip = 0;
 
-		if (len < OF_QUEUE_PROP_HEADER_LEN)
+		if (len < OF_QUEUE_PROP_MINLEN)
 			goto invalid;
 		/* property */
 		property = GET_BE_U_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		ND_PRINT("\n\t   property %s", tok2str(ofpqt_str, "invalid (0x%04x)", property));
 		/* len */
 		plen = GET_BE_U_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		ND_PRINT(", len %u", plen);
-		if (plen < OF_QUEUE_PROP_HEADER_LEN || plen > len)
+		if (plen < OF_QUEUE_PROP_MINLEN || plen > len + 4)
 			goto invalid;
 		/* pad */
-		ND_TCHECK_4(cp);
-		cp += 4;
+		/* Sometimes the last field, check bounds. */
+		OF_CHK_FWD(4);
 		/* property-specific constraints and decoding */
 		switch (property) {
 		case OFPQT_NONE:
-			plen_bogus = plen != OF_QUEUE_PROP_HEADER_LEN;
+			plen_bogus = plen != OF_QUEUE_PROP_MINLEN;
 			break;
 		case OFPQT_MIN_RATE:
-			plen_bogus = plen != OF_QUEUE_PROP_MIN_RATE_LEN;
+			plen_bogus = plen != OF_QUEUE_PROP_MIN_RATE_FIXLEN;
 			break;
 		default:
 			skip = 1;
@@ -1231,86 +1158,73 @@ of10_queue_props_print(netdissect_options *ndo,
 			skip = 1;
 		}
 		if (skip) {
-			ND_TCHECK_LEN(cp, plen - 4);
-			cp += plen - 4;
-			goto next_property;
+			/*
+			 * plen >= OF_QUEUE_PROP_MINLEN
+			 * cp is OF_QUEUE_PROP_MINLEN bytes in
+			 */
+			OF_CHK_FWD(plen - OF_QUEUE_PROP_MINLEN);
+			continue;
 		}
 		if (property == OFPQT_MIN_RATE) { /* the only case of property decoding */
 			/* rate */
-			rate = GET_BE_U_2(cp);
-			cp += 2;
+			uint16_t rate = GET_BE_U_2(cp);
+			OF_FWD(2);
 			if (rate > 1000)
 				ND_PRINT(", rate disabled");
 			else
 				ND_PRINT(", rate %u.%u%%", rate / 10, rate % 10);
 			/* pad */
-			ND_TCHECK_6(cp);
-			cp += 6;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(6);
 		}
-next_property:
-		len -= plen;
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the rest of queue properties */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_queues_print(netdissect_options *ndo,
-                  const u_char *cp, const u_char *ep, u_int len)
+                  const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-	uint16_t desclen;
-
 	while (len) {
-		if (len < OF_PACKET_QUEUE_LEN)
+		uint16_t desclen;
+
+		if (len < OF_PACKET_QUEUE_MINLEN)
 			goto invalid;
 		/* queue_id */
 		ND_PRINT("\n\t  queue_id %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* len */
 		desclen = GET_BE_U_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		ND_PRINT(", len %u", desclen);
-		if (desclen < OF_PACKET_QUEUE_LEN || desclen > len)
+		if (desclen < OF_PACKET_QUEUE_MINLEN || desclen > len + 6)
 			goto invalid;
 		/* pad */
-		ND_TCHECK_2(cp);
-		cp += 2;
+		/* Sometimes the last field, check bounds. */
+		OF_CHK_FWD(2);
 		/* properties */
-		if (ndo->ndo_vflag < 2) {
-			ND_TCHECK_LEN(cp, desclen - OF_PACKET_QUEUE_LEN);
-			cp += desclen - OF_PACKET_QUEUE_LEN;
-			goto next_queue;
-		}
-		if (ep == (cp = of10_queue_props_print(ndo, cp, ep, desclen - OF_PACKET_QUEUE_LEN)))
-			return ep; /* end of snapshot */
-next_queue:
-		len -= desclen;
+		if (ndo->ndo_vflag >= 2)
+			of10_queue_props_print(ndo, cp, desclen - OF_PACKET_QUEUE_MINLEN);
+		else
+			ND_TCHECK_LEN(cp, desclen - OF_PACKET_QUEUE_MINLEN);
+		OF_FWD(desclen - OF_PACKET_QUEUE_MINLEN);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the rest of queues */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* [OF10] Section 5.2.3 */
-static const u_char *
+static void
 of10_match_print(netdissect_options *ndo,
-                 const char *pfx, const u_char *cp, const u_char *ep)
+                 const char *pfx, const u_char *cp)
 {
 	uint32_t wildcards;
 	uint16_t dl_type;
@@ -1364,7 +1278,6 @@ of10_match_print(netdissect_options *ndo,
 		ND_PRINT("%smatch %s %u", pfx, field_name, nw_proto);
 	}
 	/* pad2 */
-	ND_TCHECK_2(cp);
 	cp += 2;
 	/* nw_src */
 	nw_bits = (wildcards & OFPFW_NW_SRC_MASK) >> OFPFW_NW_SRC_SHIFT;
@@ -1377,7 +1290,6 @@ of10_match_print(netdissect_options *ndo,
 		ND_PRINT("%smatch nw_dst %s/%u", pfx, GET_IPADDR_STRING(cp), 32 - nw_bits);
 	cp += 4;
 	/* tp_src */
-	ND_TCHECK_2(cp);
 	if (! (wildcards & OFPFW_TP_SRC)) {
 		field_name = ! (wildcards & OFPFW_DL_TYPE) && dl_type == ETHERTYPE_IP
 		  && ! (wildcards & OFPFW_NW_PROTO) && nw_proto == IPPROTO_ICMP
@@ -1386,48 +1298,51 @@ of10_match_print(netdissect_options *ndo,
 	}
 	cp += 2;
 	/* tp_dst */
-	ND_TCHECK_2(cp);
+	/* The last unconditional check was at nw_proto, so have an "else" here. */
 	if (! (wildcards & OFPFW_TP_DST)) {
 		field_name = ! (wildcards & OFPFW_DL_TYPE) && dl_type == ETHERTYPE_IP
 		  && ! (wildcards & OFPFW_NW_PROTO) && nw_proto == IPPROTO_ICMP
 		  ? "icmp_code" : "tp_dst";
 		ND_PRINT("%smatch %s %u", pfx, field_name, GET_BE_U_2(cp));
 	}
-	return cp + 2;
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	else
+		ND_TCHECK_2(cp);
 }
 
 /* [OF10] Section 5.2.4 */
-static const u_char *
+static void
 of10_actions_print(netdissect_options *ndo,
-                   const char *pfx, const u_char *cp, const u_char *ep,
-                   u_int len)
+                   const char *pfx, const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-	uint16_t type, alen, output_port;
-
 	while (len) {
+		uint16_t type, alen, output_port;
 		u_char alen_bogus = 0, skip = 0;
 
-		if (len < OF_ACTION_HEADER_LEN)
+		if (len < OF_ACTION_MINLEN)
 			goto invalid;
 		/* type */
 		type = GET_BE_U_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		ND_PRINT("%saction type %s", pfx, tok2str(ofpat_str, "invalid (0x%04x)", type));
 		/* length */
 		alen = GET_BE_U_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		ND_PRINT(", len %u", alen);
+		/*
+		 * The 4-byte "pad" in the specification is not a field of the
+		 * action header, but a placeholder to illustrate the 64-bit
+		 * alignment requirement. Action type specific case blocks
+		 * below fetch these 4 bytes.
+		 */
+
 		/* On action size underrun/overrun skip the rest of the action list. */
-		if (alen < OF_ACTION_HEADER_LEN || alen > len)
+		if (alen < OF_ACTION_MINLEN || alen > len + 4)
 			goto invalid;
-		/* On action size inappropriate for the given type or invalid type just skip
-		 * the current action, as the basic length constraint has been met. */
+		/*
+		 * After validating the basic length constraint it will be safe
+		 * to skip the current action if the action size is not valid
+		 * for the type or the type is invalid.
+		 */
 		switch (type) {
 		case OFPAT_OUTPUT:
 		case OFPAT_SET_VLAN_VID:
@@ -1456,187 +1371,185 @@ of10_actions_print(netdissect_options *ndo,
 			skip = 1;
 		}
 		if (skip) {
-			ND_TCHECK_LEN(cp, alen - 4);
-			cp += alen - 4;
-			goto next_action;
+			/*
+			 * alen >= OF_ACTION_MINLEN
+			 * cp is 4 bytes in
+			 */
+			OF_CHK_FWD(alen - 4);
+			continue;
 		}
 		/* OK to decode the rest of the action structure */
 		switch (type) {
 		case OFPAT_OUTPUT:
 			/* port */
 			output_port = GET_BE_U_2(cp);
-			cp += 2;
+			OF_FWD(2);
 			ND_PRINT(", port %s", tok2str(ofpp_str, "%u", output_port));
 			/* max_len */
 			if (output_port == OFPP_CONTROLLER)
 				ND_PRINT(", max_len %u", GET_BE_U_2(cp));
-			cp += 2;
+			else
+				ND_TCHECK_2(cp);
+			OF_FWD(2);
 			break;
 		case OFPAT_SET_VLAN_VID:
 			/* vlan_vid */
 			ND_PRINT(", vlan_vid %s", vlan_str(GET_BE_U_2(cp)));
-			cp += 2;
+			OF_FWD(2);
 			/* pad */
-			ND_TCHECK_2(cp);
-			cp += 2;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(2);
 			break;
 		case OFPAT_SET_VLAN_PCP:
 			/* vlan_pcp */
 			ND_PRINT(", vlan_pcp %s", pcp_str(GET_U_1(cp)));
-			cp += 1;
+			OF_FWD(1);
 			/* pad */
-			ND_TCHECK_3(cp);
-			cp += 3;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(3);
 			break;
 		case OFPAT_SET_DL_SRC:
 		case OFPAT_SET_DL_DST:
 			/* dl_addr */
 			ND_PRINT(", dl_addr %s", GET_ETHERADDR_STRING(cp));
-			cp += MAC_ADDR_LEN;
+			OF_FWD(MAC_ADDR_LEN);
 			/* pad */
-			ND_TCHECK_6(cp);
-			cp += 6;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(6);
 			break;
 		case OFPAT_SET_NW_SRC:
 		case OFPAT_SET_NW_DST:
 			/* nw_addr */
 			ND_PRINT(", nw_addr %s", GET_IPADDR_STRING(cp));
-			cp += 4;
+			OF_FWD(4);
 			break;
 		case OFPAT_SET_NW_TOS:
 			/* nw_tos */
 			ND_PRINT(", nw_tos 0x%02x", GET_U_1(cp));
-			cp += 1;
+			OF_FWD(1);
 			/* pad */
-			ND_TCHECK_3(cp);
-			cp += 3;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(3);
 			break;
 		case OFPAT_SET_TP_SRC:
 		case OFPAT_SET_TP_DST:
 			/* nw_tos */
 			ND_PRINT(", tp_port %u", GET_BE_U_2(cp));
-			cp += 2;
+			OF_FWD(2);
 			/* pad */
-			ND_TCHECK_2(cp);
-			cp += 2;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(2);
 			break;
 		case OFPAT_ENQUEUE:
 			/* port */
 			ND_PRINT(", port %s",
 				 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-			cp += 2;
+			OF_FWD(2);
 			/* pad */
-			ND_TCHECK_6(cp);
-			cp += 6;
+			OF_FWD(6);
 			/* queue_id */
 			ND_PRINT(", queue_id %s",
 				 tok2str(ofpq_str, "%u", GET_BE_U_4(cp)));
-			cp += 4;
+			OF_FWD(4);
 			break;
 		case OFPAT_VENDOR:
-			if (ep == (cp = of10_vendor_action_print(ndo, cp, ep, alen - 4)))
-				return ep; /* end of snapshot */
+			of10_vendor_action_print(ndo, cp, alen - 4);
+			OF_FWD(alen - 4);
 			break;
 		case OFPAT_STRIP_VLAN:
 			/* pad */
-			ND_TCHECK_4(cp);
-			cp += 4;
+			/* Sometimes the last field, check bounds. */
+			OF_CHK_FWD(4);
 			break;
 		} /* switch */
-next_action:
-		len -= alen;
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the rest of actions */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* [OF10] Section 5.3.1 */
-static const u_char *
+static void
 of10_features_reply_print(netdissect_options *ndo,
-                          const u_char *cp, const u_char *ep, const u_int len)
+                          const u_char *cp, u_int len)
 {
 	/* datapath_id */
 	ND_PRINT("\n\t dpid 0x%016" PRIx64, GET_BE_U_8(cp));
-	cp += 8;
+	OF_FWD(8);
 	/* n_buffers */
 	ND_PRINT(", n_buffers %u", GET_BE_U_4(cp));
-	cp += 4;
+	OF_FWD(4);
 	/* n_tables */
 	ND_PRINT(", n_tables %u", GET_U_1(cp));
-	cp += 1;
+	OF_FWD(1);
 	/* pad */
-	cp += 3;
+	OF_FWD(3);
 	/* capabilities */
 	ND_PRINT("\n\t capabilities 0x%08x", GET_BE_U_4(cp));
 	of10_bitmap_print(ndo, ofp_capabilities_bm, GET_BE_U_4(cp), OFPCAP_U);
-	cp += 4;
+	OF_FWD(4);
 	/* actions */
 	ND_PRINT("\n\t actions 0x%08x", GET_BE_U_4(cp));
 	of10_bitmap_print(ndo, ofpat_bm, GET_BE_U_4(cp), OFPAT_U);
-	cp += 4;
+	OF_FWD(4);
 	/* ports */
-	return of10_phy_ports_print(ndo, cp, ep, len - OF_SWITCH_FEATURES_LEN);
+	of10_phy_ports_print(ndo, cp, len);
 }
 
 /* [OF10] Section 5.3.3 */
-static const u_char *
+static void
 of10_flow_mod_print(netdissect_options *ndo,
-                    const u_char *cp, const u_char *ep, const u_int len)
+                    const u_char *cp, u_int len)
 {
 	uint16_t command;
 
 	/* match */
-	if (ep == (cp = of10_match_print(ndo, "\n\t ", cp, ep)))
-		return ep; /* end of snapshot */
+	of10_match_print(ndo, "\n\t ", cp);
+	OF_FWD(OF_MATCH_FIXLEN);
 	/* cookie */
 	ND_PRINT("\n\t cookie 0x%016" PRIx64, GET_BE_U_8(cp));
-	cp += 8;
+	OF_FWD(8);
 	/* command */
 	command = GET_BE_U_2(cp);
 	ND_PRINT(", command %s", tok2str(ofpfc_str, "invalid (0x%04x)", command));
-	cp += 2;
+	OF_FWD(2);
 	/* idle_timeout */
 	if (GET_BE_U_2(cp))
 		ND_PRINT(", idle_timeout %u", GET_BE_U_2(cp));
-	cp += 2;
+	OF_FWD(2);
 	/* hard_timeout */
 	if (GET_BE_U_2(cp))
 		ND_PRINT(", hard_timeout %u", GET_BE_U_2(cp));
-	cp += 2;
+	OF_FWD(2);
 	/* priority */
 	if (GET_BE_U_2(cp))
 		ND_PRINT(", priority %u", GET_BE_U_2(cp));
-	cp += 2;
+	OF_FWD(2);
 	/* buffer_id */
 	if (command == OFPFC_ADD || command == OFPFC_MODIFY ||
 	    command == OFPFC_MODIFY_STRICT)
 		ND_PRINT(", buffer_id %s",
 		         tok2str(bufferid_str, "0x%08x", GET_BE_U_4(cp)));
-	cp += 4;
+	OF_FWD(4);
 	/* out_port */
 	if (command == OFPFC_DELETE || command == OFPFC_DELETE_STRICT)
 		ND_PRINT(", out_port %s",
 		         tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-	cp += 2;
+	OF_FWD(2);
 	/* flags */
 	ND_PRINT(", flags 0x%04x", GET_BE_U_2(cp));
 	of10_bitmap_print(ndo, ofpff_bm, GET_BE_U_2(cp), OFPFF_U);
-	cp += 2;
+	OF_FWD(2);
 	/* actions */
-	return of10_actions_print(ndo, "\n\t ", cp, ep, len - OF_FLOW_MOD_LEN);
+	of10_actions_print(ndo, "\n\t ", cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_port_mod_print(netdissect_options *ndo,
-                    const u_char *cp, const u_char *ep)
+                    const u_char *cp)
 {
 	/* port_no */
 	ND_PRINT("\n\t port_no %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
@@ -1657,425 +1570,368 @@ of10_port_mod_print(netdissect_options *ndo,
 	of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
 	cp += 4;
 	/* pad */
+	/* Always the last field, check bounds. */
 	ND_TCHECK_4(cp);
-	return cp + 4;
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
 /* [OF10] Section 5.3.5 */
-static const u_char *
+static void
 of10_stats_request_print(netdissect_options *ndo,
-                         const u_char *cp, const u_char *ep, u_int len)
+                         const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
 	uint16_t type;
 
 	/* type */
 	type = GET_BE_U_2(cp);
-	cp += 2;
+	OF_FWD(2);
 	ND_PRINT("\n\t type %s", tok2str(ofpst_str, "invalid (0x%04x)", type));
 	/* flags */
 	ND_PRINT(", flags 0x%04x", GET_BE_U_2(cp));
 	if (GET_BE_U_2(cp))
 		ND_PRINT(" (bogus)");
-	cp += 2;
+	OF_FWD(2);
 	/* type-specific body of one of fixed lengths */
-	len -= OF_STATS_REQUEST_LEN;
 	switch(type) {
 	case OFPST_DESC:
 	case OFPST_TABLE:
 		if (len)
 			goto invalid;
-		return cp;
+		return;
 	case OFPST_FLOW:
 	case OFPST_AGGREGATE:
-		if (len != OF_FLOW_STATS_REQUEST_LEN)
+		if (len != OF_FLOW_STATS_REQUEST_FIXLEN)
 			goto invalid;
 		/* match */
-		if (ep == (cp = of10_match_print(ndo, "\n\t ", cp, ep)))
-			return ep; /* end of snapshot */
+		of10_match_print(ndo, "\n\t ", cp);
+		OF_FWD(OF_MATCH_FIXLEN);
 		/* table_id */
 		ND_PRINT("\n\t table_id %s",
 			 tok2str(tableid_str, "%u", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
-		cp += 1;
+		OF_FWD(1);
 		/* out_port */
 		ND_PRINT(", out_port %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		return cp + 2;
+		return;
 	case OFPST_PORT:
-		if (len != OF_PORT_STATS_REQUEST_LEN)
+		if (len != OF_PORT_STATS_REQUEST_FIXLEN)
 			goto invalid;
 		/* port_no */
 		ND_PRINT("\n\t port_no %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* pad */
-		ND_TCHECK_6(cp);
-		return cp + 6;
+		/* Always the last field, check bounds. */
+		OF_CHK_FWD(6);
+		return;
 	case OFPST_QUEUE:
-		if (len != OF_QUEUE_STATS_REQUEST_LEN)
+		if (len != OF_QUEUE_STATS_REQUEST_FIXLEN)
 			goto invalid;
 		/* port_no */
 		ND_PRINT("\n\t port_no %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* pad */
-		ND_TCHECK_2(cp);
-		cp += 2;
+		OF_FWD(2);
 		/* queue_id */
 		ND_PRINT(", queue_id %s",
 			 tok2str(ofpq_str, "%u", GET_BE_U_4(cp)));
-		return cp + 4;
+		return;
 	case OFPST_VENDOR:
-		return of10_vendor_data_print(ndo, cp, ep, len);
+		of10_vendor_data_print(ndo, cp, len);
+		return;
 	}
-	return cp;
+	return;
 
 invalid: /* skip the message body */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_desc_stats_reply_print(netdissect_options *ndo,
-                            const u_char *cp, const u_char *ep, const u_int len)
+                            const u_char *cp, u_int len)
 {
-	if (len != OF_DESC_STATS_LEN)
+	if (len != OF_DESC_STATS_REPLY_FIXLEN)
 		goto invalid;
 	/* mfr_desc */
 	ND_PRINT("\n\t  mfr_desc '");
 	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
 	ND_PRINT("'");
-	cp += DESC_STR_LEN;
+	OF_FWD(DESC_STR_LEN);
 	/* hw_desc */
 	ND_PRINT("\n\t  hw_desc '");
 	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
 	ND_PRINT("'");
-	cp += DESC_STR_LEN;
+	OF_FWD(DESC_STR_LEN);
 	/* sw_desc */
 	ND_PRINT("\n\t  sw_desc '");
 	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
 	ND_PRINT("'");
-	cp += DESC_STR_LEN;
+	OF_FWD(DESC_STR_LEN);
 	/* serial_num */
 	ND_PRINT("\n\t  serial_num '");
 	(void)nd_print(ndo, cp, cp + SERIAL_NUM_LEN);
 	ND_PRINT("'");
-	cp += SERIAL_NUM_LEN;
+	OF_FWD(SERIAL_NUM_LEN);
 	/* dp_desc */
 	ND_PRINT("\n\t  dp_desc '");
 	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
 	ND_PRINT("'");
-	return cp + DESC_STR_LEN;
+	return;
 
 invalid: /* skip the message body */
 	nd_print_invalid(ndo);
 	ND_TCHECK_LEN(cp, len);
-	return cp + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_flow_stats_reply_print(netdissect_options *ndo,
-                            const u_char *cp, const u_char *ep, u_int len)
+                            const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-	uint16_t entry_len;
-
 	while (len) {
-		if (len < OF_FLOW_STATS_LEN)
+		uint16_t entry_len;
+
+		if (len < OF_FLOW_STATS_REPLY_MINLEN)
 			goto invalid;
 		/* length */
 		entry_len = GET_BE_U_2(cp);
 		ND_PRINT("\n\t length %u", entry_len);
-		if (entry_len < OF_FLOW_STATS_LEN || entry_len > len)
+		if (entry_len < OF_FLOW_STATS_REPLY_MINLEN || entry_len > len)
 			goto invalid;
-		cp += 2;
+		OF_FWD(2);
 		/* table_id */
 		ND_PRINT(", table_id %s",
 			 tok2str(tableid_str, "%u", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
-		ND_TCHECK_1(cp);
-		cp += 1;
+		OF_FWD(1);
 		/* match */
-		if (ep == (cp = of10_match_print(ndo, "\n\t  ", cp, ep)))
-			return ep; /* end of snapshot */
+		of10_match_print(ndo, "\n\t  ", cp);
+		OF_FWD(OF_MATCH_FIXLEN);
 		/* duration_sec */
 		ND_PRINT("\n\t  duration_sec %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* duration_nsec */
 		ND_PRINT(", duration_nsec %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* priority */
 		ND_PRINT(", priority %u", GET_BE_U_2(cp));
-		cp += 2;
+		OF_FWD(2);
 		/* idle_timeout */
 		ND_PRINT(", idle_timeout %u", GET_BE_U_2(cp));
-		cp += 2;
+		OF_FWD(2);
 		/* hard_timeout */
 		ND_PRINT(", hard_timeout %u", GET_BE_U_2(cp));
-		cp += 2;
+		OF_FWD(2);
 		/* pad2 */
-		cp += 6;
+		OF_FWD(6);
 		/* cookie */
 		ND_PRINT(", cookie 0x%016" PRIx64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* packet_count */
 		ND_PRINT(", packet_count %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* byte_count */
 		ND_PRINT(", byte_count %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* actions */
-		if (ep == (cp = of10_actions_print(ndo, "\n\t  ", cp, ep, entry_len - OF_FLOW_STATS_LEN)))
-			return ep; /* end of snapshot */
-
-		len -= entry_len;
+		of10_actions_print(ndo, "\n\t  ", cp, entry_len - OF_FLOW_STATS_REPLY_MINLEN);
+		OF_FWD(entry_len - OF_FLOW_STATS_REPLY_MINLEN);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the rest of flow statistics entries */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_aggregate_stats_reply_print(netdissect_options *ndo,
-                                 const u_char *cp, const u_char *ep,
-                                 const u_int len)
+                                 const u_char *cp, u_int len)
 {
-	if (len != OF_AGGREGATE_STATS_REPLY_LEN)
+	if (len != OF_AGGREGATE_STATS_REPLY_FIXLEN)
 		goto invalid;
 	/* packet_count */
 	ND_PRINT("\n\t packet_count %" PRIu64, GET_BE_U_8(cp));
-	cp += 8;
+	OF_FWD(8);
 	/* byte_count */
 	ND_PRINT(", byte_count %" PRIu64, GET_BE_U_8(cp));
-	cp += 8;
+	OF_FWD(8);
 	/* flow_count */
 	ND_PRINT(", flow_count %u", GET_BE_U_4(cp));
-	cp += 4;
+	OF_FWD(4);
 	/* pad */
+	/* Always the last field, check bounds. */
 	ND_TCHECK_4(cp);
-	return cp + 4;
+	return;
 
 invalid: /* skip the message body */
 	nd_print_invalid(ndo);
 	ND_TCHECK_LEN(cp, len);
-	return cp + len;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_table_stats_reply_print(netdissect_options *ndo,
-                             const u_char *cp, const u_char *ep, u_int len)
+                             const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-
 	while (len) {
-		if (len < OF_TABLE_STATS_LEN)
+		if (len < OF_TABLE_STATS_REPLY_FIXLEN)
 			goto invalid;
 		/* table_id */
 		ND_PRINT("\n\t table_id %s",
 		         tok2str(tableid_str, "%u", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
-		ND_TCHECK_3(cp);
-		cp += 3;
+		OF_FWD(3);
 		/* name */
 		ND_PRINT(", name '");
 		(void)nd_print(ndo, cp, cp + OFP_MAX_TABLE_NAME_LEN);
 		ND_PRINT("'");
-		cp += OFP_MAX_TABLE_NAME_LEN;
+		OF_FWD(OFP_MAX_TABLE_NAME_LEN);
 		/* wildcards */
 		ND_PRINT("\n\t  wildcards 0x%08x", GET_BE_U_4(cp));
 		of10_bitmap_print(ndo, ofpfw_bm, GET_BE_U_4(cp), OFPFW_U);
-		cp += 4;
+		OF_FWD(4);
 		/* max_entries */
 		ND_PRINT("\n\t  max_entries %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* active_count */
 		ND_PRINT(", active_count %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* lookup_count */
 		ND_PRINT(", lookup_count %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* matched_count */
 		ND_PRINT(", matched_count %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
-
-		len -= OF_TABLE_STATS_LEN;
+		OF_FWD(8);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the undersized trailing data */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_port_stats_reply_print(netdissect_options *ndo,
-                            const u_char *cp, const u_char *ep, u_int len)
+                            const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-
 	while (len) {
-		if (len < OF_PORT_STATS_LEN)
+		if (len < OF_PORT_STATS_REPLY_FIXLEN)
 			goto invalid;
 		/* port_no */
 		ND_PRINT("\n\t  port_no %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		if (ndo->ndo_vflag < 2) {
-			ND_TCHECK_LEN(cp, OF_PORT_STATS_LEN - 2);
-			cp += OF_PORT_STATS_LEN - 2;
-			goto next_port;
+			OF_CHK_FWD(OF_PORT_STATS_REPLY_FIXLEN - 2);
+			continue;
 		}
 		/* pad */
-		cp += 6;
+		OF_FWD(6);
 		/* rx_packets */
 		ND_PRINT(", rx_packets %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_packets */
 		ND_PRINT(", tx_packets %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_bytes */
 		ND_PRINT(", rx_bytes %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_bytes */
 		ND_PRINT(", tx_bytes %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_dropped */
 		ND_PRINT(", rx_dropped %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_dropped */
 		ND_PRINT(", tx_dropped %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_errors */
 		ND_PRINT(", rx_errors %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_errors */
 		ND_PRINT(", tx_errors %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_frame_err */
 		ND_PRINT(", rx_frame_err %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_over_err */
 		ND_PRINT(", rx_over_err %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* rx_crc_err */
 		ND_PRINT(", rx_crc_err %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* collisions */
 		ND_PRINT(", collisions %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
-next_port:
-		len -= OF_PORT_STATS_LEN;
+		OF_FWD(8);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the undersized trailing data */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_queue_stats_reply_print(netdissect_options *ndo,
-                             const u_char *cp, const u_char *ep, u_int len)
+                             const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-
 	while (len) {
-		if (len < OF_QUEUE_STATS_LEN)
+		if (len < OF_QUEUE_STATS_REPLY_FIXLEN)
 			goto invalid;
 		/* port_no */
 		ND_PRINT("\n\t  port_no %s",
 		         tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* pad */
-		cp += 2;
+		OF_FWD(2);
 		/* queue_id */
 		ND_PRINT(", queue_id %u", GET_BE_U_4(cp));
-		cp += 4;
+		OF_FWD(4);
 		/* tx_bytes */
 		ND_PRINT(", tx_bytes %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_packets */
 		ND_PRINT(", tx_packets %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
+		OF_FWD(8);
 		/* tx_errors */
 		ND_PRINT(", tx_errors %" PRIu64, GET_BE_U_8(cp));
-		cp += 8;
-
-		len -= OF_QUEUE_STATS_LEN;
+		OF_FWD(8);
 	} /* while */
-	return cp;
+	return;
 
 invalid: /* skip the undersized trailing data */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* ibid */
-static const u_char *
+static void
 of10_stats_reply_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const u_int len)
+                       const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
 	uint16_t type;
 
 	/* type */
 	type = GET_BE_U_2(cp);
 	ND_PRINT("\n\t type %s", tok2str(ofpst_str, "invalid (0x%04x)", type));
-	cp += 2;
+	OF_FWD(2);
 	/* flags */
 	ND_PRINT(", flags 0x%04x", GET_BE_U_2(cp));
 	of10_bitmap_print(ndo, ofpsf_reply_bm, GET_BE_U_2(cp), OFPSF_REPLY_U);
-	cp += 2;
+	OF_FWD(2);
 
 	if (ndo->ndo_vflag > 0) {
-		const u_char *(*decoder)(netdissect_options *, const u_char *, const u_char *, u_int) =
+		void (*decoder)(netdissect_options *, const u_char *, u_int) =
 			type == OFPST_DESC      ? of10_desc_stats_reply_print      :
 			type == OFPST_FLOW      ? of10_flow_stats_reply_print      :
 			type == OFPST_AGGREGATE ? of10_aggregate_stats_reply_print :
@@ -2084,91 +1940,78 @@ of10_stats_reply_print(netdissect_options *ndo,
 			type == OFPST_QUEUE     ? of10_queue_stats_reply_print     :
 			type == OFPST_VENDOR    ? of10_vendor_data_print           :
 			NULL;
-		if (decoder != NULL)
-			return decoder(ndo, cp, ep, len - OF_STATS_REPLY_LEN);
+		if (decoder != NULL) {
+			decoder(ndo, cp, len);
+			return;
+		}
 	}
-	ND_TCHECK_LEN(cp0, len);
-	return cp0 + len;
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* [OF10] Section 5.3.6 */
-static const u_char *
+static void
 of10_packet_out_print(netdissect_options *ndo,
-                      const u_char *cp, const u_char *ep, const u_int len)
+                      const u_char *cp, u_int len)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
 	uint16_t actions_len;
 
 	/* buffer_id */
 	ND_PRINT("\n\t buffer_id 0x%08x", GET_BE_U_4(cp));
-	cp += 4;
+	OF_FWD(4);
 	/* in_port */
 	ND_PRINT(", in_port %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-	cp += 2;
+	OF_FWD(2);
 	/* actions_len */
 	actions_len = GET_BE_U_2(cp);
-	cp += 2;
-	if (actions_len > len - OF_PACKET_OUT_LEN)
+	OF_FWD(2);
+	if (actions_len > len)
 		goto invalid;
 	/* actions */
-	if (ep == (cp = of10_actions_print(ndo, "\n\t ", cp, ep, actions_len)))
-		return ep; /* end of snapshot */
+	of10_actions_print(ndo, "\n\t ", cp, actions_len);
+	OF_FWD(actions_len);
 	/* data */
-	return of10_packet_data_print(ndo, cp, ep, len - OF_PACKET_OUT_LEN - actions_len);
+	of10_packet_data_print(ndo, cp, len);
+	return;
 
 invalid: /* skip the rest of the message body */
 	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp0, len0);
-	return cp0 + len0;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }
 
 /* [OF10] Section 5.4.1 */
-static const u_char *
+static void
 of10_packet_in_print(netdissect_options *ndo,
-                     const u_char *cp, const u_char *ep, const u_int len)
+                     const u_char *cp, u_int len)
 {
 	/* buffer_id */
 	ND_PRINT("\n\t buffer_id %s",
 	         tok2str(bufferid_str, "0x%08x", GET_BE_U_4(cp)));
-	cp += 4;
+	OF_FWD(4);
 	/* total_len */
 	ND_PRINT(", total_len %u", GET_BE_U_2(cp));
-	cp += 2;
+	OF_FWD(2);
 	/* in_port */
 	ND_PRINT(", in_port %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-	cp += 2;
+	OF_FWD(2);
 	/* reason */
 	ND_PRINT(", reason %s",
 		 tok2str(ofpr_str, "invalid (0x%02x)", GET_U_1(cp)));
-	cp += 1;
+	OF_FWD(1);
 	/* pad */
-	ND_TCHECK_1(cp);
-	cp += 1;
+	/* Sometimes the last field, check bounds. */
+	OF_CHK_FWD(1);
 	/* data */
-	/* 2 mock octets count in OF_PACKET_IN_LEN but not in len */
-	return of10_packet_data_print(ndo, cp, ep, len - (OF_PACKET_IN_LEN - 2));
-
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	of10_packet_data_print(ndo, cp, len);
 }
 
 /* [OF10] Section 5.4.2 */
-static const u_char *
+static void
 of10_flow_removed_print(netdissect_options *ndo,
-                        const u_char *cp, const u_char *ep)
+                        const u_char *cp)
 {
 	/* match */
-	if (ep == (cp = of10_match_print(ndo, "\n\t ", cp, ep)))
-		return ep; /* end of snapshot */
+	of10_match_print(ndo, "\n\t ", cp);
+	cp += OF_MATCH_FIXLEN;
 	/* cookie */
 	ND_PRINT("\n\t cookie 0x%016" PRIx64, GET_BE_U_8(cp));
 	cp += 8;
@@ -2199,217 +2042,233 @@ of10_flow_removed_print(netdissect_options *ndo,
 	cp += 8;
 	/* byte_count */
 	ND_PRINT(", byte_count %" PRIu64, GET_BE_U_8(cp));
-	return cp + 8;
 }
 
 /* [OF10] Section 5.4.4 */
-static const u_char *
+static void
 of10_error_print(netdissect_options *ndo,
-                 const u_char *cp, const u_char *ep, const u_int len)
+                 const u_char *cp, u_int len)
 {
-	uint16_t type;
-	const struct tok *code_str;
+	uint16_t type, code;
+	const struct tok *code_str[OFPET_MAX + 1] = {
+		/* [OFPET_HELLO_FAILED   ] = */ ofphfc_str,
+		/* [OFPET_BAD_REQUEST    ] = */ ofpbrc_str,
+		/* [OFPET_BAD_ACTION     ] = */ ofpbac_str,
+		/* [OFPET_FLOW_MOD_FAILED] = */ ofpfmfc_str,
+		/* [OFPET_PORT_MOD_FAILED] = */ ofppmfc_str,
+		/* [OFPET_QUEUE_OP_FAILED] = */ ofpqofc_str,
+	};
 
 	/* type */
 	type = GET_BE_U_2(cp);
-	cp += 2;
+	OF_FWD(2);
 	ND_PRINT("\n\t type %s", tok2str(ofpet_str, "invalid (0x%04x)", type));
 	/* code */
-	code_str =
-		type == OFPET_HELLO_FAILED    ? ofphfc_str  :
-		type == OFPET_BAD_REQUEST     ? ofpbrc_str  :
-		type == OFPET_BAD_ACTION      ? ofpbac_str  :
-		type == OFPET_FLOW_MOD_FAILED ? ofpfmfc_str :
-		type == OFPET_PORT_MOD_FAILED ? ofppmfc_str :
-		type == OFPET_QUEUE_OP_FAILED ? ofpqofc_str :
-		empty_str;
-	ND_PRINT(", code %s",
-	         tok2str(code_str, "invalid (0x%04x)", GET_BE_U_2(cp)));
-	cp += 2;
+	code = GET_BE_U_2(cp);
+	OF_FWD(2);
+	if (type <= OFPET_MAX && code_str[type] != NULL)
+		ND_PRINT(", code %s",
+		         tok2str(code_str[type], "invalid (0x%04x)", code));
+	else
+		ND_PRINT(", code invalid (0x%04x)", code);
 	/* data */
-	return of10_data_print(ndo, cp, ep, len - OF_ERROR_MSG_LEN);
+	of_data_print(ndo, cp, len);
 }
 
-const u_char *
-of10_header_body_print(netdissect_options *ndo,
-                       const u_char *cp, const u_char *ep, const uint8_t type,
-                       const uint16_t len, const uint32_t xid)
+void
+of10_message_print(netdissect_options *ndo,
+                   const u_char *cp, uint16_t len, const uint8_t type)
 {
-	const u_char *cp0 = cp;
-	const u_int len0 = len;
-	/* Thus far message length is not less than the basic header size, but most
-	 * message types have additional assorted constraints on the length. Wherever
-	 * possible, check that message length meets the constraint, in remaining
-	 * cases check that the length is OK to begin decoding and leave any final
-	 * verification up to a lower-layer function. When the current message is
-	 * invalid, proceed to the next message. */
-
-	/* [OF10] Section 5.1 */
-	ND_PRINT("\n\tversion 1.0, type %s, length %u, xid 0x%08x",
-	         tok2str(ofpt_str, "invalid (0x%02x)", type), len, xid);
+	/*
+	 * Here "cp" and "len" stand for the message part beyond the common
+	 * OpenFlow 1.0 header, if any. Subtract OF_HEADER_FIXLEN from the
+	 * type-specific lengths, which include the header length, when (and
+	 * only when) validating the length in this function. No other code
+	 * in this file needs to take OF_HEADER_FIXLEN into account.
+	 *
+	 * Most message types are longer than just the header, and the length
+	 * constraints may be complex. When possible, validate the constraint
+	 * completely here, otherwise check that the message is long enough to
+	 * begin the decoding and let the lower-layer function do any remaining
+	 * validation.
+	 */
 	switch (type) {
 	/* OpenFlow header only. */
 	case OFPT_FEATURES_REQUEST: /* [OF10] Section 5.3.1 */
 	case OFPT_GET_CONFIG_REQUEST: /* [OF10] Section 5.3.2 */
 	case OFPT_BARRIER_REQUEST: /* [OF10] Section 5.3.7 */
 	case OFPT_BARRIER_REPLY: /* ibid */
-		if (len != OF_HEADER_LEN)
+		if (len)
 			goto invalid;
-		break;
+		return;
 
 	/* OpenFlow header and fixed-size message body. */
 	case OFPT_SET_CONFIG: /* [OF10] Section 5.3.2 */
 	case OFPT_GET_CONFIG_REPLY: /* ibid */
-		if (len != OF_SWITCH_CONFIG_LEN)
+		if (len != OF_SWITCH_CONFIG_FIXLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
+			break;
 		/* flags */
 		ND_PRINT("\n\t flags %s",
 		         tok2str(ofp_config_str, "invalid (0x%04x)",
 		         GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* miss_send_len */
 		ND_PRINT(", miss_send_len %u", GET_BE_U_2(cp));
-		return cp + 2;
+		return;
 	case OFPT_PORT_MOD:
-		if (len != OF_PORT_MOD_LEN)
+		if (len != OF_PORT_MOD_FIXLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_port_mod_print(ndo, cp, ep);
+			break;
+		of10_port_mod_print(ndo, cp);
+		return;
 	case OFPT_QUEUE_GET_CONFIG_REQUEST: /* [OF10] Section 5.3.4 */
-		if (len != OF_QUEUE_GET_CONFIG_REQUEST_LEN)
+		if (len != OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
+			break;
 		/* port */
-		ND_PRINT("\n\t port_no %s",
+		ND_PRINT("\n\t port %s",
 		         tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* pad */
+		/* Always the last field, check bounds. */
 		ND_TCHECK_2(cp);
-		return cp + 2;
+		return;
 	case OFPT_FLOW_REMOVED:
-		if (len != OF_FLOW_REMOVED_LEN)
+		if (len != OF_FLOW_REMOVED_FIXLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_flow_removed_print(ndo, cp, ep);
+			break;
+		of10_flow_removed_print(ndo, cp);
+		return;
 	case OFPT_PORT_STATUS: /* [OF10] Section 5.4.3 */
-		if (len != OF_PORT_STATUS_LEN)
+		if (len != OF_PORT_STATUS_FIXLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
+			break;
 		/* reason */
 		ND_PRINT("\n\t reason %s",
 		         tok2str(ofppr_str, "invalid (0x%02x)", GET_U_1(cp)));
-		cp += 1;
+		OF_FWD(1);
 		/* pad */
-		ND_TCHECK_7(cp);
-		cp += 7;
+		/* No need to check bounds, more data follows. */
+		OF_FWD(7);
 		/* desc */
-		return of10_phy_ports_print(ndo, cp, ep, OF_PHY_PORT_LEN);
+		of10_phy_ports_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header, fixed-size message body and n * fixed-size data units. */
 	case OFPT_FEATURES_REPLY:
-		if (len < OF_SWITCH_FEATURES_LEN)
+		if (len < OF_FEATURES_REPLY_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_features_reply_print(ndo, cp, ep, len);
+			break;
+		of10_features_reply_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header and variable-size data. */
 	case OFPT_HELLO: /* [OF10] Section 5.5.1 */
 	case OFPT_ECHO_REQUEST: /* [OF10] Section 5.5.2 */
 	case OFPT_ECHO_REPLY: /* [OF10] Section 5.5.3 */
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_data_print(ndo, cp, ep, len - OF_HEADER_LEN);
+			break;
+		of_data_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header, fixed-size message body and variable-size data. */
 	case OFPT_ERROR:
-		if (len < OF_ERROR_MSG_LEN)
+		if (len < OF_ERROR_MSG_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_error_print(ndo, cp, ep, len);
+			break;
+		of10_error_print(ndo, cp, len);
+		return;
 	case OFPT_VENDOR:
 		/* [OF10] Section 5.5.4 */
-		if (len < OF_VENDOR_HEADER_LEN)
+		if (len < OF_VENDOR_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_vendor_message_print(ndo, cp, ep, len - OF_HEADER_LEN);
+			break;
+		of10_vendor_message_print(ndo, cp, len);
+		return;
 	case OFPT_PACKET_IN:
-		/* 2 mock octets count in OF_PACKET_IN_LEN but not in len */
-		if (len < OF_PACKET_IN_LEN - 2)
+		/* 2 mock octets count in OF_PACKET_IN_MINLEN but not in len */
+		if (len < OF_PACKET_IN_MINLEN - 2 - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_packet_in_print(ndo, cp, ep, len);
+			break;
+		of10_packet_in_print(ndo, cp, len);
+		return;
 
 	/* a. OpenFlow header. */
 	/* b. OpenFlow header and one of the fixed-size message bodies. */
 	/* c. OpenFlow header, fixed-size message body and variable-size data. */
 	case OFPT_STATS_REQUEST:
-		if (len < OF_STATS_REQUEST_LEN)
+		if (len < OF_STATS_REQUEST_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_stats_request_print(ndo, cp, ep, len);
+			break;
+		of10_stats_request_print(ndo, cp, len);
+		return;
 
 	/* a. OpenFlow header and fixed-size message body. */
 	/* b. OpenFlow header and n * fixed-size data units. */
 	/* c. OpenFlow header and n * variable-size data units. */
 	/* d. OpenFlow header, fixed-size message body and variable-size data. */
 	case OFPT_STATS_REPLY:
-		if (len < OF_STATS_REPLY_LEN)
+		if (len < OF_STATS_REPLY_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_stats_reply_print(ndo, cp, ep, len);
+			break;
+		of10_stats_reply_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header and n * variable-size data units and variable-size data. */
 	case OFPT_PACKET_OUT:
-		if (len < OF_PACKET_OUT_LEN)
+		if (len < OF_PACKET_OUT_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_packet_out_print(ndo, cp, ep, len);
+			break;
+		of10_packet_out_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header, fixed-size message body and n * variable-size data units. */
 	case OFPT_FLOW_MOD:
-		if (len < OF_FLOW_MOD_LEN)
+		if (len < OF_FLOW_MOD_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
-		return of10_flow_mod_print(ndo, cp, ep, len);
+			break;
+		of10_flow_mod_print(ndo, cp, len);
+		return;
 
 	/* OpenFlow header, fixed-size message body and n * variable-size data units. */
 	case OFPT_QUEUE_GET_CONFIG_REPLY: /* [OF10] Section 5.3.4 */
-		if (len < OF_QUEUE_GET_CONFIG_REPLY_LEN)
+		if (len < OF_QUEUE_GET_CONFIG_REPLY_MINLEN - OF_HEADER_FIXLEN)
 			goto invalid;
 		if (ndo->ndo_vflag < 1)
-			goto next_message;
+			break;
 		/* port */
-		ND_PRINT("\n\t port_no %s",
+		ND_PRINT("\n\t port %s",
 			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		cp += 2;
+		OF_FWD(2);
 		/* pad */
-		ND_TCHECK_6(cp);
-		cp += 6;
+		/* Sometimes the last field, check bounds. */
+		OF_CHK_FWD(6);
 		/* queues */
-		return of10_queues_print(ndo, cp, ep, len - OF_QUEUE_GET_CONFIG_REPLY_LEN);
+		of10_queues_print(ndo, cp, len);
+		return;
 	} /* switch (type) */
-	goto next_message;
+	/*
+	 * Not a recognised type or did not print the details, fall back to
+	 * a bounds check.
+	 */
+	ND_TCHECK_LEN(cp, len);
+	return;
 
 invalid: /* skip the message body */
 	nd_print_invalid(ndo);
-next_message:
-	ND_TCHECK_LEN(cp0, len0 - OF_HEADER_LEN);
-	return cp0 + len0 - OF_HEADER_LEN;
-trunc:
-	nd_print_trunc(ndo);
-	return ep;
+	ND_TCHECK_LEN(cp, len);
 }

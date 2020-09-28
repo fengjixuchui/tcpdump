@@ -247,6 +247,9 @@ of10_pf5240-vv	of10_pf5240.pcap	of10_pf5240-vv.out	-vv
 of10_7050q-v	of10_7050q.pcapng	of10_7050q-v.out	-v
 of10_7050sx_bsn-vv	of10_7050sx_bsn.pcap		of10_7050sx_bsn-vv.out	-vv
 of10_7050sx_bsn-oobr of10_7050sx_bsn-oobr.pcap of10_7050sx_bsn-oobr.out -v
+of13_ericsson		of13_ericsson.pcapng	of13_ericsson.out
+of13_ericsson-v		of13_ericsson.pcapng	of13_ericsson-v.out	-v
+of13_ericsson-vv	of13_ericsson.pcapng	of13_ericsson-vv.out	-vv
 
 # GeoNetworking and CALM FAST tests
 geonet-calm-fast	geonet_and_calm_fast.pcap	geonet_and_calm_fast.out	-vv
@@ -390,6 +393,7 @@ geneve-tcp	geneve.pcap		geneve-tcp.out	"geneve && tcp"
 
 # DHCP tests
 dhcp-rfc3004	dhcp-rfc3004.pcap	dhcp-rfc3004-v.out	-v
+dhcp-rfc4388	dhcp-rfc4388.pcap	dhcp-rfc4388.out	-v
 dhcp-rfc5859	dhcp-rfc5859.pcap	dhcp-rfc5859-v.out	-v
 dhcp-mud	dhcp-mud.pcap		dhcp-mud.out	-vv
 

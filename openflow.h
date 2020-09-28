@@ -30,7 +30,18 @@
 /* for netdissect_options */
 #include "netdissect.h"
 
-#define OF_HEADER_LEN 8
+#define OF_FWD(n) { \
+	cp += (n); \
+	len -= (n); \
+}
+
+#define OF_CHK_FWD(n) { \
+	ND_TCHECK_LEN(cp, (n)); \
+	cp += (n); \
+	len -= (n); \
+}
+
+#define OF_HEADER_FIXLEN 8U
 
 #define ONF_EXP_ONF               0x4f4e4600
 #define ONF_EXP_BUTE              0xff000001
@@ -42,10 +53,22 @@
 #define ONF_EXP_OTRANS            0xff000007
 extern const struct tok onf_exp_str[];
 
-/*
- * Routines to print packets for various versions of OpenFlow.
- */
-extern const u_char *of10_header_body_print(netdissect_options *ndo,
-	const u_char *, const u_char *,
-	const uint8_t, const uint16_t, const uint32_t);
 extern const char * of_vendor_name(const uint32_t);
+extern void of_data_print(netdissect_options *ndo,
+	const u_char *, const u_int);
+
+/*
+ * Routines to handle various versions of OpenFlow.
+ */
+extern void of10_message_print(netdissect_options *ndo,
+	const u_char *, uint16_t, const uint8_t);
+extern void of13_message_print(netdissect_options *ndo,
+	const u_char *, uint16_t, const uint8_t);
+
+/*
+ * Use this instead of ofpt_str[] and OFPT_ constants because OpenFlow
+ * specifications define protocol encoding in C syntax, and different
+ * versions clash on many names, including the OFPT_ constants.
+ */
+extern const char * of10_msgtype_str(const uint8_t);
+extern const char * of13_msgtype_str(const uint8_t);
