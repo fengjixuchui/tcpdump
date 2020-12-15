@@ -97,31 +97,7 @@
 #define OFPT_BARRIER_REPLY            0x13
 #define OFPT_QUEUE_GET_CONFIG_REQUEST 0x14
 #define OFPT_QUEUE_GET_CONFIG_REPLY   0x15
-static const struct tok ofpt_str[] = {
-	{ OFPT_HELLO,                    "HELLO"                    },
-	{ OFPT_ERROR,                    "ERROR"                    },
-	{ OFPT_ECHO_REQUEST,             "ECHO_REQUEST"             },
-	{ OFPT_ECHO_REPLY,               "ECHO_REPLY"               },
-	{ OFPT_VENDOR,                   "VENDOR"                   },
-	{ OFPT_FEATURES_REQUEST,         "FEATURES_REQUEST"         },
-	{ OFPT_FEATURES_REPLY,           "FEATURES_REPLY"           },
-	{ OFPT_GET_CONFIG_REQUEST,       "GET_CONFIG_REQUEST"       },
-	{ OFPT_GET_CONFIG_REPLY,         "GET_CONFIG_REPLY"         },
-	{ OFPT_SET_CONFIG,               "SET_CONFIG"               },
-	{ OFPT_PACKET_IN,                "PACKET_IN"                },
-	{ OFPT_FLOW_REMOVED,             "FLOW_REMOVED"             },
-	{ OFPT_PORT_STATUS,              "PORT_STATUS"              },
-	{ OFPT_PACKET_OUT,               "PACKET_OUT"               },
-	{ OFPT_FLOW_MOD,                 "FLOW_MOD"                 },
-	{ OFPT_PORT_MOD,                 "PORT_MOD"                 },
-	{ OFPT_STATS_REQUEST,            "STATS_REQUEST"            },
-	{ OFPT_STATS_REPLY,              "STATS_REPLY"              },
-	{ OFPT_BARRIER_REQUEST,          "BARRIER_REQUEST"          },
-	{ OFPT_BARRIER_REPLY,            "BARRIER_REPLY"            },
-	{ OFPT_QUEUE_GET_CONFIG_REQUEST, "QUEUE_GET_CONFIG_REQUEST" },
-	{ OFPT_QUEUE_GET_CONFIG_REPLY,   "QUEUE_GET_CONFIG_REPLY"   },
-	{ 0, NULL }
-};
+#define OFPT_MAX                      OFPT_QUEUE_GET_CONFIG_REPLY
 
 #define OFPPC_PORT_DOWN    (1U <<0)
 #define OFPPC_NO_STP       (1U <<1)
@@ -144,14 +120,18 @@ static const struct tok ofppc_bm[] = {
                    OFPPC_NO_RECV_STP | OFPPC_NO_FLOOD | OFPPC_NO_FWD | \
                    OFPPC_NO_PACKET_IN))
 
-#define OFPPS_LINK_DOWN   (1U << 0)
-#define OFPPS_STP_LISTEN  (0U << 8)
-#define OFPPS_STP_LEARN   (1U << 8)
-#define OFPPS_STP_FORWARD (2U << 8)
-#define OFPPS_STP_BLOCK   (3U << 8)
-#define OFPPS_STP_MASK    (3U << 8)
-static const struct tok ofpps_bm[] = {
-	{ OFPPS_LINK_DOWN,   "LINK_DOWN"   },
+/*
+ * [OF10] lists all FPPS_ constants in one enum, but they mean a 1-bit bitmap
+ * in the least significant octet and a 2-bit code point in the next octet.
+ * Remember to mix or to separate these two parts as the context requires.
+ */
+#define OFPPS_LINK_DOWN   (1U << 0) /* bitmap             */
+#define OFPPS_STP_LISTEN  (0U << 8) /* code point         */
+#define OFPPS_STP_LEARN   (1U << 8) /* code point         */
+#define OFPPS_STP_FORWARD (2U << 8) /* code point         */
+#define OFPPS_STP_BLOCK   (3U << 8) /* code point         */
+#define OFPPS_STP_MASK    (3U << 8) /* code point bitmask */
+static const struct tok ofpps_stp_str[] = {
 	{ OFPPS_STP_LISTEN,  "STP_LISTEN"  },
 	{ OFPPS_STP_LEARN,   "STP_LEARN"   },
 	{ OFPPS_STP_FORWARD, "STP_FORWARD" },
@@ -456,7 +436,6 @@ static const struct tok ofpet_str[] = {
 	{ OFPET_QUEUE_OP_FAILED, "QUEUE_OP_FAILED" },
 	{ 0, NULL }
 };
-#define OFPET_MAX OFPET_QUEUE_OP_FAILED /* for of10_error_print() */
 
 #define OFPHFC_INCOMPATIBLE 0x0000U
 #define OFPHFC_EPERM        0x0001U
@@ -544,21 +523,36 @@ static const struct tok ofpqofc_str[] = {
 	{ 0, NULL }
 };
 
+static const struct uint_tokary of10_ofpet2tokary[] = {
+	{ OFPET_HELLO_FAILED,    ofphfc_str  },
+	{ OFPET_BAD_REQUEST,     ofpbrc_str  },
+	{ OFPET_BAD_ACTION,      ofpbac_str  },
+	{ OFPET_FLOW_MOD_FAILED, ofpfmfc_str },
+	{ OFPET_PORT_MOD_FAILED, ofppmfc_str },
+	{ OFPET_QUEUE_OP_FAILED, ofpqofc_str },
+	/* uint2tokary() does not use array termination. */
+};
+
+/* lengths (fixed or minimal) of particular message types, where not 0 */
+#define OF_SWITCH_CONFIG_FIXLEN            (12U - OF_HEADER_FIXLEN)
+#define OF_FEATURES_REPLY_MINLEN           (32U - OF_HEADER_FIXLEN)
+#define OF_PORT_STATUS_FIXLEN              (64U - OF_HEADER_FIXLEN)
+#define OF_PORT_MOD_FIXLEN                 (32U - OF_HEADER_FIXLEN)
+#define OF_PACKET_IN_MINLEN                (20U - OF_HEADER_FIXLEN) /* with 2 mock octets */
+#define OF_PACKET_OUT_MINLEN               (16U - OF_HEADER_FIXLEN)
+#define OF_FLOW_MOD_MINLEN                 (72U - OF_HEADER_FIXLEN)
+#define OF_FLOW_REMOVED_FIXLEN             (88U - OF_HEADER_FIXLEN)
+#define OF_ERROR_MSG_MINLEN                (12U - OF_HEADER_FIXLEN)
+#define OF_STATS_REQUEST_MINLEN            (12U - OF_HEADER_FIXLEN)
+#define OF_STATS_REPLY_MINLEN              (12U - OF_HEADER_FIXLEN)
+#define OF_VENDOR_MINLEN                   (12U - OF_HEADER_FIXLEN)
+#define OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN (12U - OF_HEADER_FIXLEN)
+#define OF_QUEUE_GET_CONFIG_REPLY_MINLEN   (16U - OF_HEADER_FIXLEN)
+
 /* lengths (fixed or minimal) of particular protocol structures */
-#define OF_SWITCH_CONFIG_FIXLEN               12
 #define OF_PHY_PORT_FIXLEN                    48
-#define OF_FEATURES_REPLY_MINLEN              32
-#define OF_PORT_STATUS_FIXLEN                 64
-#define OF_PORT_MOD_FIXLEN                    32
-#define OF_PACKET_IN_MINLEN                   20 /* with 2 mock octets */
 #define OF_ACTION_MINLEN                       8
-#define OF_PACKET_OUT_MINLEN                  16
 #define OF_MATCH_FIXLEN                       40
-#define OF_FLOW_MOD_MINLEN                    72
-#define OF_FLOW_REMOVED_FIXLEN                88
-#define OF_ERROR_MSG_MINLEN                   12
-#define OF_STATS_REQUEST_MINLEN               12
-#define OF_STATS_REPLY_MINLEN                 12
 #define OF_DESC_STATS_REPLY_FIXLEN          1056
 #define OF_FLOW_STATS_REQUEST_FIXLEN          44
 #define OF_FLOW_STATS_REPLY_MINLEN            88
@@ -566,12 +560,9 @@ static const struct tok ofpqofc_str[] = {
 #define OF_TABLE_STATS_REPLY_FIXLEN           64
 #define OF_PORT_STATS_REQUEST_FIXLEN           8
 #define OF_PORT_STATS_REPLY_FIXLEN           104
-#define OF_VENDOR_MINLEN                      12
 #define OF_QUEUE_PROP_MINLEN                   8
 #define OF_QUEUE_PROP_MIN_RATE_FIXLEN         16
 #define OF_PACKET_QUEUE_MINLEN                 8
-#define OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN    12
-#define OF_QUEUE_GET_CONFIG_REPLY_MINLEN      16
 #define OF_QUEUE_STATS_REQUEST_FIXLEN          8
 #define OF_QUEUE_STATS_REPLY_FIXLEN           32
 
@@ -682,12 +673,6 @@ static const struct tok bsn_onoff_str[] = {
 	{ 0, NULL },
 };
 
-/* [OF10] Section 5.1 */
-const char * of10_msgtype_str(const uint8_t type)
-{
-	return tok2str(ofpt_str, "invalid (0x%02x)", type);
-}
-
 static const char *
 vlan_str(const uint16_t vid)
 {
@@ -707,24 +692,6 @@ pcp_str(const uint8_t pcp)
 	snprintf(buf, sizeof(buf), "%u%s", pcp,
 	         pcp <= 7 ? "" : " (bogus)");
 	return buf;
-}
-
-static void
-of10_bitmap_print(netdissect_options *ndo,
-                  const struct tok *t, const uint32_t v, const uint32_t u)
-{
-	const char *sep = " (";
-
-	if (v == 0)
-		return;
-	/* assigned bits */
-	for (; t->s != NULL; t++)
-		if (v & t->v) {
-			ND_PRINT("%s%s", sep, t->s);
-			sep = ", ";
-		}
-	/* unassigned bits? */
-	ND_PRINT((v & u) ? ") (bogus)" : ")");
 }
 
 static void
@@ -861,7 +828,7 @@ of10_bsn_message_print(netdissect_options *ndo,
 		OF_FWD(4);
 		/* data */
 		ND_PRINT(", data '");
-		nd_printn(ndo, cp, len, NULL);
+		(void)nd_printn(ndo, cp, len, NULL);
 		ND_PRINT("'");
 		break;
 	case BSN_SHELL_OUTPUT:
@@ -878,7 +845,7 @@ of10_bsn_message_print(netdissect_options *ndo,
 		/* already checked that len >= 4 */
 		/* data */
 		ND_PRINT(", data '");
-		nd_printn(ndo, cp, len, NULL);
+		(void)nd_printn(ndo, cp, len, NULL);
 		ND_PRINT("'");
 		break;
 	case BSN_SHELL_STATUS:
@@ -996,6 +963,7 @@ invalid: /* skip the undersized data */
 	ND_TCHECK_LEN(cp, len);
 }
 
+/* [OF10] Section 5.5.4 */
 static void
 of10_vendor_message_print(netdissect_options *ndo,
                           const u_char *cp, u_int len)
@@ -1003,8 +971,6 @@ of10_vendor_message_print(netdissect_options *ndo,
 	uint32_t vendor;
 	void (*decoder)(netdissect_options *, const u_char *, u_int);
 
-	if (len < 4)
-		goto invalid;
 	/* vendor */
 	vendor = GET_BE_U_4(cp);
 	OF_FWD(4);
@@ -1014,11 +980,6 @@ of10_vendor_message_print(netdissect_options *ndo,
 		vendor == OUI_BSN         ? of10_bsn_message_print         :
 		of_data_print;
 	decoder(ndo, cp, len);
-	return;
-
-invalid: /* skip the undersized data */
-	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp, len);
 }
 
 /* Vendor ID is mandatory, data is optional. */
@@ -1063,59 +1024,59 @@ of10_packet_data_print(netdissect_options *ndo,
 
 /* [OF10] Section 5.2.1 */
 static void
-of10_phy_ports_print(netdissect_options *ndo,
-                     const u_char *cp, u_int len)
+of10_phy_port_print(netdissect_options *ndo,
+                    const u_char *cp)
 {
-	while (len) {
-		if (len < OF_PHY_PORT_FIXLEN)
-			goto invalid;
-		/* port_no */
-		ND_PRINT("\n\t  port_no %s",
-			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		OF_FWD(2);
-		/* hw_addr */
-		ND_PRINT(", hw_addr %s", GET_ETHERADDR_STRING(cp));
-		OF_FWD(MAC_ADDR_LEN);
-		/* name */
-		ND_PRINT(", name '");
-		(void)nd_print(ndo, cp, cp + OFP_MAX_PORT_NAME_LEN);
-		ND_PRINT("'");
-		OF_FWD(OFP_MAX_PORT_NAME_LEN);
+	uint32_t state;
 
-		if (ndo->ndo_vflag < 2) {
-			OF_CHK_FWD(24);
-			continue;
-		}
-		/* config */
-		ND_PRINT("\n\t   config 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
-		OF_FWD(4);
-		/* state */
-		ND_PRINT("\n\t   state 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofpps_bm, GET_BE_U_4(cp), OFPPS_U);
-		OF_FWD(4);
-		/* curr */
-		ND_PRINT("\n\t   curr 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		OF_FWD(4);
-		/* advertised */
-		ND_PRINT("\n\t   advertised 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		OF_FWD(4);
-		/* supported */
-		ND_PRINT("\n\t   supported 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		OF_FWD(4);
-		/* peer */
-		ND_PRINT("\n\t   peer 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
-		OF_FWD(4);
-	} /* while */
-	return;
+	/* port_no */
+	ND_PRINT("\n\t  port_no %s",
+		 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
+	cp += 2;
+	/* hw_addr */
+	ND_PRINT(", hw_addr %s", GET_ETHERADDR_STRING(cp));
+	cp += MAC_ADDR_LEN;
+	/* name */
+	ND_PRINT(", name '");
+	nd_printjnp(ndo, cp, OFP_MAX_PORT_NAME_LEN);
+	ND_PRINT("'");
+	cp += OFP_MAX_PORT_NAME_LEN;
 
-invalid: /* skip the undersized trailing data */
-	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp, len);
+	if (ndo->ndo_vflag < 2) {
+		ND_TCHECK_LEN(cp, 24);
+		return;
+	}
+	/* config */
+	ND_PRINT("\n\t   config 0x%08x", GET_BE_U_4(cp));
+	of_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
+	cp += 4;
+	/* state */
+	state = GET_BE_U_4(cp);
+	/*
+	 * Decode the code point and the single bit separately, but
+	 * format the result as a single sequence of comma-separated
+	 * strings (see the comments at the OFPPS_ props).
+	 */
+	ND_PRINT("\n\t   state 0x%08x (%s%s)%s", state,
+	         tok2str(ofpps_stp_str, "", state & OFPPS_STP_MASK),
+	         state & OFPPS_LINK_DOWN ? ", LINK_DOWN" : "",
+	         state & OFPPS_U ? " (bogus)" : "");
+	cp += 4;
+	/* curr */
+	ND_PRINT("\n\t   curr 0x%08x", GET_BE_U_4(cp));
+	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
+	cp += 4;
+	/* advertised */
+	ND_PRINT("\n\t   advertised 0x%08x", GET_BE_U_4(cp));
+	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
+	cp += 4;
+	/* supported */
+	ND_PRINT("\n\t   supported 0x%08x", GET_BE_U_4(cp));
+	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
+	cp += 4;
+	/* peer */
+	ND_PRINT("\n\t   peer 0x%08x", GET_BE_U_4(cp));
+	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
 }
 
 /* [OF10] Section 5.2.2 */
@@ -1488,14 +1449,37 @@ of10_features_reply_print(netdissect_options *ndo,
 	OF_FWD(3);
 	/* capabilities */
 	ND_PRINT("\n\t capabilities 0x%08x", GET_BE_U_4(cp));
-	of10_bitmap_print(ndo, ofp_capabilities_bm, GET_BE_U_4(cp), OFPCAP_U);
+	of_bitmap_print(ndo, ofp_capabilities_bm, GET_BE_U_4(cp), OFPCAP_U);
 	OF_FWD(4);
 	/* actions */
 	ND_PRINT("\n\t actions 0x%08x", GET_BE_U_4(cp));
-	of10_bitmap_print(ndo, ofpat_bm, GET_BE_U_4(cp), OFPAT_U);
+	of_bitmap_print(ndo, ofpat_bm, GET_BE_U_4(cp), OFPAT_U);
 	OF_FWD(4);
 	/* ports */
-	of10_phy_ports_print(ndo, cp, len);
+	while (len) {
+		if (len < OF_PHY_PORT_FIXLEN)
+			goto invalid;
+		of10_phy_port_print(ndo, cp);
+		OF_FWD(OF_PHY_PORT_FIXLEN);
+	}
+	return;
+
+invalid: /* skip the undersized trailing data */
+	nd_print_invalid(ndo);
+	ND_TCHECK_LEN(cp, len);
+}
+
+/* [OF10] Section 5.3.2 */
+static void
+of10_switch_config_msg_print(netdissect_options *ndo,
+                             const u_char *cp, u_int len _U_)
+{
+	/* flags */
+	ND_PRINT("\n\t flags %s",
+	         tok2str(ofp_config_str, "invalid (0x%04x)", GET_BE_U_2(cp)));
+	cp += 2;
+	/* miss_send_len */
+	ND_PRINT(", miss_send_len %u", GET_BE_U_2(cp));
 }
 
 /* [OF10] Section 5.3.3 */
@@ -1540,7 +1524,7 @@ of10_flow_mod_print(netdissect_options *ndo,
 	OF_FWD(2);
 	/* flags */
 	ND_PRINT(", flags 0x%04x", GET_BE_U_2(cp));
-	of10_bitmap_print(ndo, ofpff_bm, GET_BE_U_2(cp), OFPFF_U);
+	of_bitmap_print(ndo, ofpff_bm, GET_BE_U_2(cp), OFPFF_U);
 	OF_FWD(2);
 	/* actions */
 	of10_actions_print(ndo, "\n\t ", cp, len);
@@ -1549,7 +1533,7 @@ of10_flow_mod_print(netdissect_options *ndo,
 /* ibid */
 static void
 of10_port_mod_print(netdissect_options *ndo,
-                    const u_char *cp)
+                    const u_char *cp, u_int len _U_)
 {
 	/* port_no */
 	ND_PRINT("\n\t port_no %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
@@ -1559,19 +1543,47 @@ of10_port_mod_print(netdissect_options *ndo,
 	cp += MAC_ADDR_LEN;
 	/* config */
 	ND_PRINT("\n\t config 0x%08x", GET_BE_U_4(cp));
-	of10_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
+	of_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
 	cp += 4;
 	/* mask */
 	ND_PRINT("\n\t mask 0x%08x", GET_BE_U_4(cp));
-	of10_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
+	of_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
 	cp += 4;
 	/* advertise */
 	ND_PRINT("\n\t advertise 0x%08x", GET_BE_U_4(cp));
-	of10_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
+	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
 	cp += 4;
 	/* pad */
 	/* Always the last field, check bounds. */
 	ND_TCHECK_4(cp);
+}
+
+/* [OF10] Section 5.3.4 */
+static void
+of10_queue_get_config_request_print(netdissect_options *ndo,
+                                    const u_char *cp, u_int len _U_)
+{
+	/* port */
+	ND_PRINT("\n\t port %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
+	cp += 2;
+	/* pad */
+	/* Always the last field, check bounds. */
+	ND_TCHECK_2(cp);
+}
+
+/* ibid */
+static void
+of10_queue_get_config_reply_print(netdissect_options *ndo,
+                                  const u_char *cp, u_int len)
+{
+	/* port */
+	ND_PRINT("\n\t port %s", tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
+	OF_FWD(2);
+	/* pad */
+	/* Sometimes the last field, check bounds. */
+	OF_CHK_FWD(6);
+	/* queues */
+	of10_queues_print(ndo, cp, len);
 }
 
 /* [OF10] Section 5.3.5 */
@@ -1658,27 +1670,27 @@ of10_desc_stats_reply_print(netdissect_options *ndo,
 		goto invalid;
 	/* mfr_desc */
 	ND_PRINT("\n\t  mfr_desc '");
-	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
+	nd_printjnp(ndo, cp, DESC_STR_LEN);
 	ND_PRINT("'");
 	OF_FWD(DESC_STR_LEN);
 	/* hw_desc */
 	ND_PRINT("\n\t  hw_desc '");
-	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
+	nd_printjnp(ndo, cp, DESC_STR_LEN);
 	ND_PRINT("'");
 	OF_FWD(DESC_STR_LEN);
 	/* sw_desc */
 	ND_PRINT("\n\t  sw_desc '");
-	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
+	nd_printjnp(ndo, cp, DESC_STR_LEN);
 	ND_PRINT("'");
 	OF_FWD(DESC_STR_LEN);
 	/* serial_num */
 	ND_PRINT("\n\t  serial_num '");
-	(void)nd_print(ndo, cp, cp + SERIAL_NUM_LEN);
+	nd_printjnp(ndo, cp, SERIAL_NUM_LEN);
 	ND_PRINT("'");
 	OF_FWD(SERIAL_NUM_LEN);
 	/* dp_desc */
 	ND_PRINT("\n\t  dp_desc '");
-	(void)nd_print(ndo, cp, cp + DESC_STR_LEN);
+	nd_printjnp(ndo, cp, DESC_STR_LEN);
 	ND_PRINT("'");
 	return;
 
@@ -1791,12 +1803,12 @@ of10_table_stats_reply_print(netdissect_options *ndo,
 		OF_FWD(3);
 		/* name */
 		ND_PRINT(", name '");
-		(void)nd_print(ndo, cp, cp + OFP_MAX_TABLE_NAME_LEN);
+		nd_printjnp(ndo, cp, OFP_MAX_TABLE_NAME_LEN);
 		ND_PRINT("'");
 		OF_FWD(OFP_MAX_TABLE_NAME_LEN);
 		/* wildcards */
 		ND_PRINT("\n\t  wildcards 0x%08x", GET_BE_U_4(cp));
-		of10_bitmap_print(ndo, ofpfw_bm, GET_BE_U_4(cp), OFPFW_U);
+		of_bitmap_print(ndo, ofpfw_bm, GET_BE_U_4(cp), OFPFW_U);
 		OF_FWD(4);
 		/* max_entries */
 		ND_PRINT("\n\t  max_entries %u", GET_BE_U_4(cp));
@@ -1927,7 +1939,7 @@ of10_stats_reply_print(netdissect_options *ndo,
 	OF_FWD(2);
 	/* flags */
 	ND_PRINT(", flags 0x%04x", GET_BE_U_2(cp));
-	of10_bitmap_print(ndo, ofpsf_reply_bm, GET_BE_U_2(cp), OFPSF_REPLY_U);
+	of_bitmap_print(ndo, ofpsf_reply_bm, GET_BE_U_2(cp), OFPSF_REPLY_U);
 	OF_FWD(2);
 
 	if (ndo->ndo_vflag > 0) {
@@ -2007,7 +2019,7 @@ of10_packet_in_print(netdissect_options *ndo,
 /* [OF10] Section 5.4.2 */
 static void
 of10_flow_removed_print(netdissect_options *ndo,
-                        const u_char *cp)
+                        const u_char *cp, u_int len _U_)
 {
 	/* match */
 	of10_match_print(ndo, "\n\t ", cp);
@@ -2044,20 +2056,29 @@ of10_flow_removed_print(netdissect_options *ndo,
 	ND_PRINT(", byte_count %" PRIu64, GET_BE_U_8(cp));
 }
 
+/* [OF10] Section 5.4.3 */
+static void
+of10_port_status_print(netdissect_options *ndo,
+                       const u_char *cp, u_int len _U_)
+{
+	/* reason */
+	ND_PRINT("\n\t reason %s",
+	         tok2str(ofppr_str, "invalid (0x%02x)", GET_U_1(cp)));
+	cp += 1;
+	/* pad */
+	/* No need to check bounds, more data follows. */
+	cp += 7;
+	/* desc */
+	of10_phy_port_print(ndo, cp);
+}
+
 /* [OF10] Section 5.4.4 */
 static void
 of10_error_print(netdissect_options *ndo,
                  const u_char *cp, u_int len)
 {
 	uint16_t type, code;
-	const struct tok *code_str[OFPET_MAX + 1] = {
-		/* [OFPET_HELLO_FAILED   ] = */ ofphfc_str,
-		/* [OFPET_BAD_REQUEST    ] = */ ofpbrc_str,
-		/* [OFPET_BAD_ACTION     ] = */ ofpbac_str,
-		/* [OFPET_FLOW_MOD_FAILED] = */ ofpfmfc_str,
-		/* [OFPET_PORT_MOD_FAILED] = */ ofppmfc_str,
-		/* [OFPET_QUEUE_OP_FAILED] = */ ofpqofc_str,
-	};
+	const struct tok *code_str;
 
 	/* type */
 	type = GET_BE_U_2(cp);
@@ -2066,209 +2087,201 @@ of10_error_print(netdissect_options *ndo,
 	/* code */
 	code = GET_BE_U_2(cp);
 	OF_FWD(2);
-	if (type <= OFPET_MAX && code_str[type] != NULL)
+	code_str = uint2tokary(of10_ofpet2tokary, type);
+	if (code_str != NULL)
 		ND_PRINT(", code %s",
-		         tok2str(code_str[type], "invalid (0x%04x)", code));
+		         tok2str(code_str, "invalid (0x%04x)", code));
 	else
 		ND_PRINT(", code invalid (0x%04x)", code);
 	/* data */
 	of_data_print(ndo, cp, len);
 }
 
-void
-of10_message_print(netdissect_options *ndo,
-                   const u_char *cp, uint16_t len, const uint8_t type)
+static const struct of_msgtypeinfo of10_msgtypeinfo[OFPT_MAX + 1] = {
+	/*
+	 * [OF10] Section 5.5.1
+	 * Variable-size data.
+	 */
+	{
+		"HELLO",                    of_data_print,
+		REQ_MINLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.4.4
+	 * A fixed-size message body and variable-size data.
+	 */
+	{
+		"ERROR",                    of10_error_print,
+		REQ_MINLEN,                 OF_ERROR_MSG_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.5.2
+	 * Variable-size data.
+	 */
+	{
+		"ECHO_REQUEST",             of_data_print,
+		REQ_MINLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.5.3
+	 * Variable-size data.
+	 */
+	{
+		"ECHO_REPLY",               of_data_print,
+		REQ_MINLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.5.4
+	 * A fixed-size message body and variable-size data.
+	 */
+	{
+		"VENDOR",                   of10_vendor_message_print,
+		REQ_MINLEN,                 OF_VENDOR_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.1
+	 * No message body.
+	 */
+	{
+		"FEATURES_REQUEST",         NULL,
+		REQ_FIXLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.3.1
+	 * A fixed-size message body and n * fixed-size data units.
+	 */
+	{
+		"FEATURES_REPLY",           of10_features_reply_print,
+		REQ_MINLEN,                 OF_FEATURES_REPLY_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.2
+	 * No message body.
+	 */
+	{
+		"GET_CONFIG_REQUEST",       NULL,
+		REQ_FIXLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.3.2
+	 * A fixed-size message body.
+	 */
+	{
+		"GET_CONFIG_REPLY",         of10_switch_config_msg_print,
+		REQ_FIXLEN,                 OF_SWITCH_CONFIG_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.3.2
+	 * A fixed-size message body.
+	 */
+	{
+		"SET_CONFIG",               of10_switch_config_msg_print,
+		REQ_FIXLEN,                 OF_SWITCH_CONFIG_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.4.1
+	 * A fixed-size message body and variable-size data.
+	 * (The 2 mock octets count in OF_PACKET_IN_MINLEN only.)
+	 */
+	{
+		"PACKET_IN",                of10_packet_in_print,
+		REQ_MINLEN,                 OF_PACKET_IN_MINLEN - 2
+	},
+	/*
+	 * [OF10] Section 5.4.2
+	 * A fixed-size message body.
+	 */
+	{
+		"FLOW_REMOVED",             of10_flow_removed_print,
+		REQ_FIXLEN,                 OF_FLOW_REMOVED_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.4.3
+	 * A fixed-size message body.
+	 */
+	{
+		"PORT_STATUS",              of10_port_status_print,
+		REQ_FIXLEN,                 OF_PORT_STATUS_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.3.6
+	 * A fixed-size message body, n * variable-size data units and
+	 * variable-size data.
+	 */
+	{
+		"PACKET_OUT",               of10_packet_out_print,
+		REQ_MINLEN,                 OF_PACKET_OUT_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.3
+	 * A fixed-size message body and n * variable-size data units.
+	 */
+	{
+		"FLOW_MOD",                 of10_flow_mod_print,
+		REQ_MINLEN,                 OF_FLOW_MOD_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.3
+	 * A fixed-size message body.
+	 */
+	{
+		"PORT_MOD",                 of10_port_mod_print,
+		REQ_FIXLEN,                 OF_PORT_MOD_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.3.5
+	 * A fixed-size message body and possibly more data of varying size
+	 * and structure.
+	 */
+	{
+		"STATS_REQUEST",            of10_stats_request_print,
+		REQ_MINLEN,                 OF_STATS_REQUEST_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.5
+	 * A fixed-size message body and possibly more data of varying size
+	 * and structure.
+	 */
+	{
+		"STATS_REPLY",              of10_stats_reply_print,
+		REQ_MINLEN,                 OF_STATS_REPLY_MINLEN
+	},
+	/*
+	 * [OF10] Section 5.3.7
+	 * No message body.
+	 */
+	{
+		"BARRIER_REQUEST",          NULL,
+		REQ_FIXLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.3.7
+	 * No message body.
+	 */
+	{
+		"BARRIER_REPLY",            NULL,
+		REQ_FIXLEN,                 0
+	},
+	/*
+	 * [OF10] Section 5.3.4
+	 * A fixed-size message body.
+	 */
+	{
+		"QUEUE_GET_CONFIG_REQUEST", of10_queue_get_config_request_print,
+		REQ_FIXLEN,                 OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN
+	},
+	/*
+	 * [OF10] Section 5.3.4
+	 * A fixed-size message body and n * variable-size data units.
+	 */
+	{
+		"QUEUE_GET_CONFIG_REPLY",   of10_queue_get_config_reply_print,
+		REQ_MINLEN,                 OF_QUEUE_GET_CONFIG_REPLY_MINLEN
+	},
+};
+
+const struct of_msgtypeinfo *
+of10_identify_msgtype(const uint8_t type)
 {
-	/*
-	 * Here "cp" and "len" stand for the message part beyond the common
-	 * OpenFlow 1.0 header, if any. Subtract OF_HEADER_FIXLEN from the
-	 * type-specific lengths, which include the header length, when (and
-	 * only when) validating the length in this function. No other code
-	 * in this file needs to take OF_HEADER_FIXLEN into account.
-	 *
-	 * Most message types are longer than just the header, and the length
-	 * constraints may be complex. When possible, validate the constraint
-	 * completely here, otherwise check that the message is long enough to
-	 * begin the decoding and let the lower-layer function do any remaining
-	 * validation.
-	 */
-	switch (type) {
-	/* OpenFlow header only. */
-	case OFPT_FEATURES_REQUEST: /* [OF10] Section 5.3.1 */
-	case OFPT_GET_CONFIG_REQUEST: /* [OF10] Section 5.3.2 */
-	case OFPT_BARRIER_REQUEST: /* [OF10] Section 5.3.7 */
-	case OFPT_BARRIER_REPLY: /* ibid */
-		if (len)
-			goto invalid;
-		return;
-
-	/* OpenFlow header and fixed-size message body. */
-	case OFPT_SET_CONFIG: /* [OF10] Section 5.3.2 */
-	case OFPT_GET_CONFIG_REPLY: /* ibid */
-		if (len != OF_SWITCH_CONFIG_FIXLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		/* flags */
-		ND_PRINT("\n\t flags %s",
-		         tok2str(ofp_config_str, "invalid (0x%04x)",
-		         GET_BE_U_2(cp)));
-		OF_FWD(2);
-		/* miss_send_len */
-		ND_PRINT(", miss_send_len %u", GET_BE_U_2(cp));
-		return;
-	case OFPT_PORT_MOD:
-		if (len != OF_PORT_MOD_FIXLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_port_mod_print(ndo, cp);
-		return;
-	case OFPT_QUEUE_GET_CONFIG_REQUEST: /* [OF10] Section 5.3.4 */
-		if (len != OF_QUEUE_GET_CONFIG_REQUEST_FIXLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		/* port */
-		ND_PRINT("\n\t port %s",
-		         tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		OF_FWD(2);
-		/* pad */
-		/* Always the last field, check bounds. */
-		ND_TCHECK_2(cp);
-		return;
-	case OFPT_FLOW_REMOVED:
-		if (len != OF_FLOW_REMOVED_FIXLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_flow_removed_print(ndo, cp);
-		return;
-	case OFPT_PORT_STATUS: /* [OF10] Section 5.4.3 */
-		if (len != OF_PORT_STATUS_FIXLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		/* reason */
-		ND_PRINT("\n\t reason %s",
-		         tok2str(ofppr_str, "invalid (0x%02x)", GET_U_1(cp)));
-		OF_FWD(1);
-		/* pad */
-		/* No need to check bounds, more data follows. */
-		OF_FWD(7);
-		/* desc */
-		of10_phy_ports_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header, fixed-size message body and n * fixed-size data units. */
-	case OFPT_FEATURES_REPLY:
-		if (len < OF_FEATURES_REPLY_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_features_reply_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header and variable-size data. */
-	case OFPT_HELLO: /* [OF10] Section 5.5.1 */
-	case OFPT_ECHO_REQUEST: /* [OF10] Section 5.5.2 */
-	case OFPT_ECHO_REPLY: /* [OF10] Section 5.5.3 */
-		if (ndo->ndo_vflag < 1)
-			break;
-		of_data_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header, fixed-size message body and variable-size data. */
-	case OFPT_ERROR:
-		if (len < OF_ERROR_MSG_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_error_print(ndo, cp, len);
-		return;
-	case OFPT_VENDOR:
-		/* [OF10] Section 5.5.4 */
-		if (len < OF_VENDOR_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_vendor_message_print(ndo, cp, len);
-		return;
-	case OFPT_PACKET_IN:
-		/* 2 mock octets count in OF_PACKET_IN_MINLEN but not in len */
-		if (len < OF_PACKET_IN_MINLEN - 2 - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_packet_in_print(ndo, cp, len);
-		return;
-
-	/* a. OpenFlow header. */
-	/* b. OpenFlow header and one of the fixed-size message bodies. */
-	/* c. OpenFlow header, fixed-size message body and variable-size data. */
-	case OFPT_STATS_REQUEST:
-		if (len < OF_STATS_REQUEST_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_stats_request_print(ndo, cp, len);
-		return;
-
-	/* a. OpenFlow header and fixed-size message body. */
-	/* b. OpenFlow header and n * fixed-size data units. */
-	/* c. OpenFlow header and n * variable-size data units. */
-	/* d. OpenFlow header, fixed-size message body and variable-size data. */
-	case OFPT_STATS_REPLY:
-		if (len < OF_STATS_REPLY_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_stats_reply_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header and n * variable-size data units and variable-size data. */
-	case OFPT_PACKET_OUT:
-		if (len < OF_PACKET_OUT_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_packet_out_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header, fixed-size message body and n * variable-size data units. */
-	case OFPT_FLOW_MOD:
-		if (len < OF_FLOW_MOD_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		of10_flow_mod_print(ndo, cp, len);
-		return;
-
-	/* OpenFlow header, fixed-size message body and n * variable-size data units. */
-	case OFPT_QUEUE_GET_CONFIG_REPLY: /* [OF10] Section 5.3.4 */
-		if (len < OF_QUEUE_GET_CONFIG_REPLY_MINLEN - OF_HEADER_FIXLEN)
-			goto invalid;
-		if (ndo->ndo_vflag < 1)
-			break;
-		/* port */
-		ND_PRINT("\n\t port %s",
-			 tok2str(ofpp_str, "%u", GET_BE_U_2(cp)));
-		OF_FWD(2);
-		/* pad */
-		/* Sometimes the last field, check bounds. */
-		OF_CHK_FWD(6);
-		/* queues */
-		of10_queues_print(ndo, cp, len);
-		return;
-	} /* switch (type) */
-	/*
-	 * Not a recognised type or did not print the details, fall back to
-	 * a bounds check.
-	 */
-	ND_TCHECK_LEN(cp, len);
-	return;
-
-invalid: /* skip the message body */
-	nd_print_invalid(ndo);
-	ND_TCHECK_LEN(cp, len);
+	return type <= OFPT_MAX ? &of10_msgtypeinfo[type] : NULL;
 }

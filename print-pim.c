@@ -137,7 +137,7 @@ static const struct tok pimv2_df_election_flag_values[] = {
 
 /*
  * XXX: We consider a case where IPv6 is not ready yet for portability,
- * but PIM dependent defintions should be independent of IPv6...
+ * but PIM dependent definitions should be independent of IPv6...
  */
 
 struct pim {
@@ -256,7 +256,6 @@ pimv1_join_prune_print(netdissect_options *ndo,
 	return;
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }
 
 void
@@ -338,7 +337,6 @@ pimv1_print(netdissect_options *ndo,
 
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }
 
 /*
@@ -450,7 +448,6 @@ cisco_autorp_print(netdissect_options *ndo,
 
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }
 
 void

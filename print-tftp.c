@@ -27,8 +27,6 @@
 
 #include "netdissect-stdinc.h"
 
-#include <string.h>
-
 #include "netdissect.h"
 #include "extract.h"
 
@@ -197,5 +195,4 @@ tftp_print(netdissect_options *ndo,
 	return;
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }

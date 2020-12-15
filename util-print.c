@@ -199,33 +199,25 @@ nd_printn(netdissect_options *ndo,
 }
 
 /*
- * Print out a null-padded filename (or other ASCII string), part of
- * the packet buffer.
- * If ep is NULL, assume no truncation check is needed.
- * Return true if truncated.
- * Stop at ep (if given) or after n bytes or before the null char,
- * whichever is first.
+ * Print a null-padded filename (or other ASCII string), part of
+ * the packet buffer, filtering out non-printable characters.
+ * Stop if truncated (via GET_U_1/longjmp) or after n bytes or before
+ * the null char, whichever occurs first.
+ * The suffix comes from: j:longJmp, n:after N bytes, p:null-Padded.
  */
-int
-nd_printzp(netdissect_options *ndo,
-           const u_char *s, u_int n,
-           const u_char *ep)
+void
+nd_printjnp(netdissect_options *ndo, const u_char *s, u_int n)
 {
-	int ret;
 	u_char c;
 
-	ret = 1;			/* assume truncated */
-	while (n > 0 && (ep == NULL || s < ep)) {
-		n--;
+	while (n > 0) {
 		c = GET_U_1(s);
-		s++;
-		if (c == '\0') {
-			ret = 0;
+		if (c == '\0')
 			break;
-		}
 		fn_print_char(ndo, c);
+		n--;
+		s++;
 	}
-	return (n == 0) ? 0 : ret;
 }
 
 /*
@@ -533,6 +525,9 @@ tok2str(const struct tok *lp, const char *fmt,
  * Convert a bit token value to a string; use "fmt" if not found.
  * this is useful for parsing bitfields, the output strings are separated
  * if the s field is positive.
+ *
+ * A token matches iff it has one or more bits set and every bit that is set
+ * in the token is set in v. Consequently, a 0 token never matches.
  */
 static char *
 bittok2str_internal(const struct tok *lp, const char *fmt,
@@ -541,41 +536,29 @@ bittok2str_internal(const struct tok *lp, const char *fmt,
         static char buf[1024+1]; /* our string buffer */
         char *bufp = buf;
         size_t space_left = sizeof(buf), string_size;
-        u_int rotbit; /* this is the bit we rotate through all bitpositions */
-        u_int tokval;
         const char * sepstr = "";
 
-	while (lp != NULL && lp->s != NULL) {
-            tokval=lp->v;   /* load our first value */
-            rotbit=1;
-            while (rotbit != 0) {
-                /*
-                 * lets AND the rotating bit with our token value
-                 * and see if we have got a match
-                 */
-		if (tokval == (v&rotbit)) {
-                    /* ok we have found something */
-                    if (space_left <= 1)
-                        return (buf); /* only enough room left for NUL, if that */
-                    string_size = strlcpy(bufp, sepstr, space_left);
-                    if (string_size >= space_left)
-                        return (buf);    /* we ran out of room */
-                    bufp += string_size;
-                    space_left -= string_size;
-                    if (space_left <= 1)
-                        return (buf); /* only enough room left for NUL, if that */
-                    string_size = strlcpy(bufp, lp->s, space_left);
-                    if (string_size >= space_left)
-                        return (buf);    /* we ran out of room */
-                    bufp += string_size;
-                    space_left -= string_size;
-                    sepstr = sep;
-                    break;
-                }
-                rotbit=rotbit<<1; /* no match - lets shift and try again */
+        while (lp != NULL && lp->s != NULL) {
+            if (lp->v && (v & lp->v) == lp->v) {
+                /* ok we have found something */
+                if (space_left <= 1)
+                    return (buf); /* only enough room left for NUL, if that */
+                string_size = strlcpy(bufp, sepstr, space_left);
+                if (string_size >= space_left)
+                    return (buf);    /* we ran out of room */
+                bufp += string_size;
+                space_left -= string_size;
+                if (space_left <= 1)
+                    return (buf); /* only enough room left for NUL, if that */
+                string_size = strlcpy(bufp, lp->s, space_left);
+                if (string_size >= space_left)
+                    return (buf);    /* we ran out of room */
+                bufp += string_size;
+                space_left -= string_size;
+                sepstr = sep;
             }
             lp++;
-	}
+        }
 
         if (bufp == buf)
             /* bummer - lets print the "unknown" message as advised in the fmt string if we got one */
@@ -623,6 +606,20 @@ tok2strary_internal(const char **lp, int n, const char *fmt,
 		fmt = "#%d";
 	(void)snprintf(buf, sizeof(buf), fmt, v);
 	return (buf);
+}
+
+const struct tok *
+uint2tokary_internal(const struct uint_tokary dict[], const size_t size,
+                     const u_int val)
+{
+	size_t i;
+	/* Try a direct lookup before the full scan. */
+	if (val < size && dict[val].uintval == val)
+		return dict[val].tokary; /* OK if NULL */
+	for (i = 0; i < size; i++)
+		if (dict[i].uintval == val)
+			return dict[i].tokary; /* OK if NULL */
+	return NULL;
 }
 
 /*

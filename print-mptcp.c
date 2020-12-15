@@ -113,6 +113,14 @@ struct mp_dss {
 #define MP_DSS_a                        0x02
 #define MP_DSS_A                        0x01
 
+static const struct tok mptcp_addr_subecho_bits[] = {
+        { 0x6, "v0-ip6" },
+        { 0x4, "v0-ip4" },
+        { 0x1, "v1-echo" },
+        { 0x0, "v1" },
+        { 0, NULL }
+};
+
 struct mp_add_addr {
         nd_uint8_t     kind;
         nd_uint8_t     len;
@@ -185,20 +193,21 @@ mp_capable_print(netdissect_options *ndo,
                  const u_char *opt, u_int opt_len, u_char flags)
 {
         const struct mp_capable *mpc = (const struct mp_capable *) opt;
+        uint8_t version;
 
         if (!((opt_len == 12 || opt_len == 4) && flags & TH_SYN) &&
             !((opt_len == 20 || opt_len == 22) && (flags & (TH_SYN | TH_ACK)) ==
               TH_ACK))
                 return 0;
 
-        switch (MP_CAPABLE_OPT_VERSION(mpc->sub_ver)) {
+        version = MP_CAPABLE_OPT_VERSION(mpc->sub_ver); /* uses GET_U_1() */
+        switch (version) {
                 case 0: /* fall through */
                 case 1:
-                        ND_PRINT(" v%d", MP_CAPABLE_OPT_VERSION(mpc->sub_ver));
+                        ND_PRINT(" v%u", version);
                         break;
                 default:
-                        ND_PRINT(" Unknown Version (%d)",
-                                  MP_CAPABLE_OPT_VERSION(mpc->sub_ver));
+                        ND_PRINT(" Unknown Version (%u)", version);
                         return 1;
         }
 
@@ -354,6 +363,9 @@ add_addr_print(netdissect_options *ndo,
             opt_len == 20 || opt_len == 22 || opt_len == 28 || opt_len == 30))
                 return 0;
 
+        ND_PRINT(" %s",
+                 tok2str(mptcp_addr_subecho_bits, "[bad version/echo]",
+                         GET_U_1(add_addr->sub_echo) & 0xF));
         ND_PRINT(" id %u", GET_U_1(add_addr->addr_id));
         if (opt_len == 8 || opt_len == 10 || opt_len == 16 || opt_len == 18) {
                 ND_PRINT(" %s", GET_IPADDR_STRING(add_addr->u.v4.addr));
@@ -463,13 +475,9 @@ mptcp_print(netdissect_options *ndo,
                 return 0;
 
         opt = (const struct mptcp_option *) cp;
-        ND_TCHECK_SIZE(opt);
-        subtype = ND_MIN(MPTCP_OPT_SUBTYPE(opt->sub_etc), MPTCP_SUB_FCLOSE + 1);
+        subtype = MPTCP_OPT_SUBTYPE(opt->sub_etc); /* uses GET_U_1() */
+        subtype = ND_MIN(subtype, MPTCP_SUB_FCLOSE + 1);
 
         ND_PRINT(" %s", mptcp_options[subtype].name);
         return mptcp_options[subtype].print(ndo, cp, len, flags);
-
-trunc:
-        nd_print_trunc(ndo);
-        return 0;
 }

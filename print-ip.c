@@ -27,8 +27,6 @@
 
 #include "netdissect-stdinc.h"
 
-#include <string.h>
-
 #include "netdissect.h"
 #include "addrtoname.h"
 #include "extract.h"
@@ -502,7 +500,6 @@ ip_print(netdissect_options *ndo,
 
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }
 
 void

@@ -51,9 +51,9 @@ struct aarp {
 	nd_uint16_t	htype, ptype;
 	nd_uint8_t	halen, palen;
 	nd_uint16_t	op;
-	uint8_t		hsaddr[6];
+	nd_mac_addr	hsaddr;
 	uint8_t		psaddr[4];
-	uint8_t		hdaddr[6];
+	nd_mac_addr	hdaddr;
 	uint8_t		pdaddr[4];
 };
 
@@ -238,7 +238,7 @@ aarp_print(netdissect_options *ndo,
 	}
 	if (GET_BE_U_2(ap->htype) == 1 &&
 	    GET_BE_U_2(ap->ptype) == ETHERTYPE_ATALK &&
-	    GET_U_1(ap->halen) == 6 && GET_U_1(ap->palen) == 4 )
+	    GET_U_1(ap->halen) == MAC_ADDR_LEN && GET_U_1(ap->palen) == 4)
 		switch (GET_BE_U_2(ap->op)) {
 
 		case 1:				/* request */
@@ -636,7 +636,7 @@ ataddr_string(netdissect_options *ndo,
 					if (tp->name == NULL)
 						(*ndo->ndo_error)(ndo,
 						    S_ERR_ND_MEM_ALLOC,
-						    "ataddr_string: strdup(nambuf)");
+						    "%s: strdup(nambuf)", __func__);
 				}
 				fclose(fp);
 			}
@@ -661,7 +661,7 @@ ataddr_string(netdissect_options *ndo,
 			tp->name = strdup(nambuf);
 			if (tp->name == NULL)
 				(*ndo->ndo_error)(ndo, S_ERR_ND_MEM_ALLOC,
-					"ataddr_string: strdup(nambuf)");
+					"%s: strdup(nambuf)", __func__);
 			return (tp->name);
 		}
 
@@ -674,7 +674,7 @@ ataddr_string(netdissect_options *ndo,
 	tp->name = strdup(nambuf);
 	if (tp->name == NULL)
 		(*ndo->ndo_error)(ndo, S_ERR_ND_MEM_ALLOC,
-				  "ataddr_string: strdup(nambuf)");
+				  "%s: strdup(nambuf)", __func__);
 
 	return (tp->name);
 }

@@ -17,9 +17,6 @@
 
 #include "netdissect-stdinc.h"
 
-#include <stdio.h>
-#include <string.h>
-
 #include "netdissect.h"
 #include "addrtoname.h"
 #include "extract.h"
@@ -295,8 +292,8 @@ dccp_print(netdissect_options *ndo, const u_char *bp, const u_char *data2,
 	if (cp > ndo->ndo_snapend)
 		goto trunc;
 	if (len < sizeof(struct dccp_hdr)) {
-		ND_PRINT("truncated-dccp - %u bytes missing!",
-			 (u_int)sizeof(struct dccp_hdr) - len);
+		ND_PRINT("truncated-dccp - %zu bytes missing!",
+			 sizeof(struct dccp_hdr) - len);
 		return;
 	}
 
@@ -510,7 +507,6 @@ dccp_print(netdissect_options *ndo, const u_char *bp, const u_char *data2,
 	return;
 trunc:
 	nd_print_trunc(ndo);
-	return;
 }
 
 static const struct tok dccp_option_values[] = {

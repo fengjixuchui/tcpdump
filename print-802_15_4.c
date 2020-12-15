@@ -256,7 +256,7 @@ static const char *p_mlme_short_names[] = {
 	"CTM IE",					/* 0x32 */
 	"Timestamp IE",					/* 0x33 */
 	"Timestamp Difference IE",			/* 0x34 */
-	"TMCTP Sepcification IE",			/* 0x35 */
+	"TMCTP Specification IE",			/* 0x35 */
 	"RCC PHY Operating Mode IE",			/* 0x36 */
 	"Reserved 0x37",				/* 0x37 */
 	"Reserved 0x38",				/* 0x38 */
@@ -548,7 +548,6 @@ ieee802_15_4_print_addr(netdissect_options *ndo, const u_char *p,
 		ND_PRINT("%s", GET_LE64ADDR_STRING(p));
 		break;
 	}
-	return;
 }
 
 /*
@@ -569,7 +568,7 @@ ieee802_15_4_print_superframe_specification(netdissect_options *ndo,
 		 ((ss >> 8) & 0xf));
 	if (CHECK_BIT(ss, 12)) { ND_PRINT(", BLE enabled"); }
 	if (CHECK_BIT(ss, 14)) { ND_PRINT(", PAN Coordinator"); }
-	if (CHECK_BIT(ss, 15)) { ND_PRINT(", Assocation Permit"); }
+	if (CHECK_BIT(ss, 15)) { ND_PRINT(", Association Permit"); }
 }
 
 /*
@@ -720,7 +719,7 @@ ieee802_15_4_print_header_ie(netdissect_options *ndo,
 		break;
 	case 0x1c: /* DSME PAN Descriptor IE */
 		/*FALLTHROUGH*/
-	case 0x21: /* Extended DSME PAN descriptior IE */
+	case 0x21: /* Extended DSME PAN descriptor IE */
 		if (ie_len < 2) {
 			ND_PRINT("[ERROR: Truncated DSME PAN IE]");
 		} else {
@@ -788,7 +787,7 @@ ieee802_15_4_print_header_ie(netdissect_options *ndo,
 				}
 			}
 			if (ie_len < ptr + 8) {
-				ND_PRINT(" [ERROR: Truncated before Time syncronization specification]");
+				ND_PRINT(" [ERROR: Truncated before Time synchronization specification]");
 				break;
 			}
 			ND_PRINT("Beacon timestamp = %" PRIu64 ", offset = %d",
@@ -1088,7 +1087,7 @@ ieee802_15_4_print_mlme_ie(netdissect_options *ndo,
 		}
 
 		break;
-	case 0x1a: /* TSCH Syncronization IE. */
+	case 0x1a: /* TSCH Synchronization IE. */
 		if (sub_ie_len < 6) {
 			ND_PRINT("[ERROR: Length != 6]");
 		}
@@ -1213,7 +1212,7 @@ ieee802_15_4_print_mlme_ie(netdissect_options *ndo,
 		/* XXX Not implemented */
 	case 0x2c: /* TVWS Device Capabilities IE */
 		/* XXX Not implemented */
-	case 0x2d: /* TVWS Device Catagory IE */
+	case 0x2d: /* TVWS Device Category IE */
 		/* XXX Not implemented */
 	case 0x2e: /* TVWS Device Identification IE */
 		/* XXX Not implemented */
@@ -1300,7 +1299,6 @@ ieee802_15_4_print_mlme_ie_list(netdissect_options *ndo,
 		p += sub_ie_len;
 		ie_len -= 2 + sub_ie_len;
 	} while (ie_len > 0);
-	return;
 }
 
 /*
@@ -1611,9 +1609,9 @@ ieee802_15_4_print_command_data(netdissect_options *ndo,
 	u_int i;
 
 	switch (command_id) {
-	case 0x01: /* Assocation Request */
+	case 0x01: /* Association Request */
 		if (caplen != 1) {
-			ND_PRINT("Invalid Assocation request command length");
+			ND_PRINT("Invalid Association request command length");
 			return -1;
 		} else {
 			uint8_t cap_info;
@@ -1634,9 +1632,9 @@ ieee802_15_4_print_command_data(netdissect_options *ndo,
 			return caplen;
 		}
 		break;
-	case 0x02: /* Assocation Response */
+	case 0x02: /* Association Response */
 		if (caplen != 3) {
-			ND_PRINT("Invalid Assocation response command length");
+			ND_PRINT("Invalid Association response command length");
 			return -1;
 		} else {
 			ND_PRINT("Short address = ");
@@ -1787,7 +1785,7 @@ ieee802_15_4_print_command_data(netdissect_options *ndo,
 }
 
 /*
- * Parse and print frames folloing standard format.
+ * Parse and print frames following standard format.
  *
  * Returns FALSE in case of error.
  */
@@ -1848,11 +1846,11 @@ ieee802_15_4_std_frames(netdissect_options *ndo,
 		if (CHECK_BIT(fc, 9)) { ND_PRINT("IE present, "); }
 	}
 
-	/* Check for the sequence number supression. */
+	/* Check for the sequence number suppression. */
 	if (CHECK_BIT(fc, 8)) {
 		/* Sequence number is suppressed. */
 		if (frame_version < 2) {
-			/* Sequence number can only be supressed for frame
+			/* Sequence number can only be suppressed for frame
 			   version 2 or higher, this is invalid frame. */
 			ND_PRINT("[ERROR: Sequence number suppressed on frames where version < 2]");
 		}
@@ -2261,7 +2259,7 @@ ieee802_15_4_mp_frame(netdissect_options *ndo,
 			if (ie_present) { ND_PRINT("IE present, "); }
 		}
 
-		/* Check for the sequence number supression. */
+		/* Check for the sequence number suppression. */
 		if (CHECK_BIT(fc, 10)) {
 			/* Sequence number is suppressed, but long version. */
 			p += 2;
@@ -2440,7 +2438,7 @@ ieee802_15_4_frag_frame(netdissect_options *ndo _U_,
 }
 
 /*
- * Interal call to dissector taking packet + len instead of pcap_pkthdr.
+ * Internal call to dissector taking packet + len instead of pcap_pkthdr.
  *
  * Returns FALSE in case of error.
  */

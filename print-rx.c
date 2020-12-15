@@ -40,7 +40,6 @@
 #endif
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "netdissect-stdinc.h"
 
@@ -766,7 +765,6 @@ rx_cache_find(netdissect_options *ndo, const struct rx_header *rxh,
 		}
 
 #define STROUT(MAX) { uint32_t _i; \
-			ND_TCHECK_LEN(bp, sizeof(uint32_t)); \
 			_i = GET_BE_U_4(bp); \
 			if (_i > (MAX)) \
 				goto trunc; \
@@ -791,7 +789,6 @@ rx_cache_find(netdissect_options *ndo, const struct rx_header *rxh,
 		}
 
 #define UINT64OUT() { uint64_t _i; \
-			ND_TCHECK_LEN(bp, sizeof(uint64_t)); \
 			_i = GET_BE_U_8(bp); \
 			bp += sizeof(uint64_t); \
 			ND_PRINT(" %" PRIu64, _i); \

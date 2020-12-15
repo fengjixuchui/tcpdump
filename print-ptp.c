@@ -24,7 +24,6 @@
 #include "netdissect-stdinc.h"
 #include "netdissect.h"
 #include "extract.h"
-#include <string.h>
 
 /*
  * PTP header
@@ -457,7 +456,6 @@ ptp_print(netdissect_options *ndo, const u_char *bp, u_int len)
 
 trunc:
     nd_print_trunc(ndo);
-    return;
 }
 
 static void

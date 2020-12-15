@@ -27,8 +27,6 @@
 
 #include <netdissect-stdinc.h>
 
-#include <string.h>
-
 #include "netdissect.h"
 #include "addrtoname.h"
 #include "ethertype.h"
@@ -108,7 +106,7 @@ static void macsec_print_header(netdissect_options *ndo,
 	ND_PRINT(", ");
 }
 
-/* returns < 0 if the packet can be decoded completely */
+/* returns < 0 iff the packet can be decoded completely */
 int macsec_print(netdissect_options *ndo, const u_char **bp,
 		 u_int *lengthp, u_int *caplenp, u_int *hdrlenp,
 		 const struct lladdr_info *src, const struct lladdr_info *dst)

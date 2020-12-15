@@ -111,6 +111,7 @@ daoack01        rpl-26-senddaoack.pcap      rpl-26-senddaovv.out -v -v -v
 
 # IPNET encapsulated site
 e1000g		e1000g.pcap		e1000g.out
+e1000g-e	e1000g.pcap		e1000g-e.out	-e
 
 # IPX/Netware packets
 ipx		ipx.pcap		ipx.out
@@ -229,7 +230,8 @@ msnlb2		msnlb2.pcapng		msnlb2.out
 mptcp-v0	mptcp-v0.pcap		mptcp-v0.out
 mptcp-v1	mptcp-v1.pcap		mptcp-v1.out
 mptcp-fclose	mptcp-fclose.pcap	mptcp-fclose.out
-mptcp-aa-v1     mptcp-aa-v1.pcap        mptcp-aa-v1.out
+mptcp-aa-v1	mptcp-aa-v1.pcap	mptcp-aa-v1.out
+mptcp-aa-echo	mptcp-aa-echo.pcap	mptcp-aa-echo.out
 
 # TFO tests
 tfo		tfo-5c1fa7f9ae91.pcap	tfo.out
@@ -399,6 +401,10 @@ dhcp-mud	dhcp-mud.pcap		dhcp-mud.out	-vv
 
 # VXLAN tests
 vxlan  vxlan.pcap  vxlan.out -e
+
+# PPTP tests
+pptp pptp.pcap pptp.out
+pptp-v pptp.pcap pptp-v.out -v
 
 # CVEs 2014 malformed packets from Steffen Bauch
 cve-2014-8767-OLSR cve-2014-8767-OLSR.pcap cve-2014-8767-OLSR.out -v
@@ -811,6 +817,10 @@ ptp_ethernet	ptp_ethernet.pcap	ptp_ethernet.out	-e
 
 # bad packets from Jason Xiaole
 ldp_tlv_print-oobr ldp_tlv_print-oobr.pcap ldp_tlv_print-oobr.out -v
+
+# bad packets from Hardik Shah
+dns-badlabel	dns-badlabel.pcap	dns-badlabel.out	-vv
+igrp-oobr	igrp-oobr.pcap		igrp-oobr.out		-v
 
 #someip tests
 someip1		someip1.pcap	someip1.out

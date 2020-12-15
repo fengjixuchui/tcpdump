@@ -32,6 +32,7 @@
 
 #include "netdissect-stdinc.h"
 
+#define ND_LONGJMP_FROM_TCHECK
 #include "netdissect.h"
 #include "extract.h"
 
@@ -152,6 +153,16 @@ static const struct tok RoutingKeyMgmtMessages[] = {
   { 0, NULL }
 };
 
+static const struct uint_tokary m3ua_msgc2tokary[] = {
+	{ M3UA_MSGC_MGMT,     MgmtMessages           },
+	{ M3UA_MSGC_TRANSFER, TransferMessages       },
+	{ M3UA_MSGC_SSNM,     SS7Messages            },
+	{ M3UA_MSGC_ASPSM,    ASPStateMessages       },
+	{ M3UA_MSGC_ASPTM,    ASPTrafficMessages     },
+	{ M3UA_MSGC_RKM,      RoutingKeyMgmtMessages },
+	/* uint2tokary() does not use array termination. */
+};
+
 /* M3UA Parameters */
 #define M3UA_PARAM_INFO 0x0004
 #define M3UA_PARAM_ROUTING_CTX 0x0006
@@ -218,22 +229,18 @@ tag_value_print(netdissect_options *ndo,
     /* buf and size don't include the header */
     if (size < 4)
       goto invalid;
-    ND_TCHECK_LEN(buf, size);
     ND_PRINT("0x%08x", GET_BE_U_4(buf));
     break;
   /* ... */
   default:
-    ND_PRINT("(length %u)", size + (u_int)sizeof(struct m3ua_param_header));
-    ND_TCHECK_LEN(buf, size);
+    ND_PRINT("(length %zu)", size + sizeof(struct m3ua_param_header));
   }
+  ND_TCHECK_LEN(buf, size);
   return;
 
 invalid:
   nd_print_invalid(ndo);
   ND_TCHECK_LEN(buf, size);
-  return;
-trunc:
-  nd_print_trunc(ndo);
 }
 
 /*
@@ -259,7 +266,6 @@ m3ua_tags_print(netdissect_options *ndo,
   while (p < buf + size) {
     if (p + sizeof(struct m3ua_param_header) > buf + size)
       goto invalid;
-    ND_TCHECK_LEN(p, sizeof(struct m3ua_param_header));
     /* Parameter Tag */
     hdr_tag = GET_BE_U_2(p);
     ND_PRINT("\n\t\t\t%s: ", tok2str(ParamName, "Unknown Parameter (0x%04x)", hdr_tag));
@@ -279,9 +285,6 @@ m3ua_tags_print(netdissect_options *ndo,
 invalid:
   nd_print_invalid(ndo);
   ND_TCHECK_LEN(buf, size);
-  return;
-trunc:
-  nd_print_trunc(ndo);
 }
 
 /*
@@ -312,14 +315,7 @@ m3ua_print(netdissect_options *ndo,
     return;
 
   msg_class = GET_U_1(hdr->msg_class);
-  dict =
-    msg_class == M3UA_MSGC_MGMT     ? MgmtMessages :
-    msg_class == M3UA_MSGC_TRANSFER ? TransferMessages :
-    msg_class == M3UA_MSGC_SSNM     ? SS7Messages :
-    msg_class == M3UA_MSGC_ASPSM    ? ASPStateMessages :
-    msg_class == M3UA_MSGC_ASPTM    ? ASPTrafficMessages :
-    msg_class == M3UA_MSGC_RKM      ? RoutingKeyMgmtMessages :
-    NULL;
+  dict = uint2tokary(m3ua_msgc2tokary, msg_class);
 
   ND_PRINT("\n\t\t%s", tok2str(MessageClasses, "Unknown message class %i", msg_class));
   if (dict != NULL)
@@ -337,8 +333,5 @@ m3ua_print(netdissect_options *ndo,
 invalid:
   nd_print_invalid(ndo);
   ND_TCHECK_LEN(buf, size);
-  return;
-trunc:
-  nd_print_trunc(ndo);
 }
 
