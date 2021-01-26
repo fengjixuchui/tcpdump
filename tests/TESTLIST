@@ -19,6 +19,29 @@ print-XX	print-flags.pcap	print-capXX.out	-XX
 print-A		print-flags.pcap	print-A.out	-A
 print-AA	print-flags.pcap	print-AA.out	-AA
 
+# TCP 3-Way Handshake test, nano precision
+# Use "no -t", -t, -tt, -ttt, -tttt, -ttttt options for more code coverage
+# in timestamp printing functions
+# micro outputs with -q
+tcp-handshake-micro tcp-handshake-nano.pcap tcp-handshake-micro.out -q
+tcp-handshake-micro-t tcp-handshake-nano.pcap tcp-handshake-micro-t.out -t -q
+tcp-handshake-micro-tt tcp-handshake-nano.pcap tcp-handshake-micro-tt.out -tt -q
+tcp-handshake-micro-ttt tcp-handshake-nano.pcap tcp-handshake-micro-ttt.out -ttt -q
+tcp-handshake-micro-tttt tcp-handshake-nano.pcap tcp-handshake-micro-tttt.out -tttt -q
+tcp-handshake-micro-ttttt tcp-handshake-nano.pcap tcp-handshake-micro-ttttt.out -ttttt -q
+# nano outputs with -q
+tcp-handshake-nano tcp-handshake-nano.pcap tcp-handshake-nano.out -q --nano
+tcp-handshake-nano-t tcp-handshake-nano.pcap tcp-handshake-nano-t.out -t -q --nano
+tcp-handshake-nano-tt tcp-handshake-nano.pcap tcp-handshake-nano-tt.out -tt -q --nano
+tcp-handshake-nano-ttt tcp-handshake-nano.pcap tcp-handshake-nano-ttt.out -ttt -q --nano
+tcp-handshake-nano-tttt tcp-handshake-nano.pcap tcp-handshake-nano-tttt.out -tttt -q --nano
+tcp-handshake-nano-ttttt tcp-handshake-nano.pcap tcp-handshake-nano-ttttt.out -ttttt -q --nano
+
+# TCP with data in the RST segment
+tcp_rst_data tcp_rst_data.pcap tcp_rst_data.out -v
+# TCP with data in the RST segment, truncated example
+tcp_rst_data-trunc tcp_rst_data-trunc.pcap tcp_rst_data-trunc.out -v
+
 # BGP tests
 bgp_vpn_attrset bgp_vpn_attrset.pcap bgp_vpn_attrset.out -v
 mpbgp-linklocal-nexthop mpbgp-linklocal-nexthop.pcap mpbgp-linklocal-nexthop.out -v
@@ -86,6 +109,7 @@ mpls-over-udp-v  mpls-over-udp.pcap  mpls-over-udp-v.out -v
 
 # OSPF tests
 ospf-gmpls	ospf-gmpls.pcap				ospf-gmpls.out		-v
+ospf-nssa-bitnt	ospf-nssa-bitnt.pcap			ospf-nssa-bitnt.out	-v
 ospf3_ah-vv	OSPFv3_with_AH.pcap			ospf3_ah-vv.out		-v -v
 ospf3_auth-vv	ospf3_auth.pcapng			ospf3_auth-vv.out 	-v -v
 ospf3_bc-vv	OSPFv3_broadcast_adjacency.pcap		ospf3_bc-vv.out		-v -v
@@ -725,13 +749,13 @@ rtp-seg-fault-2  rtp-seg-fault-2.pcapng  rtp-seg-fault-2.out  -v -T rtp
 ssh			ssh.pcap		ssh.out
 
 # MACsec
-macsec-encrypted       macsec-encrypted.pcap          macsec-encrypted.out        -t -e
-macsec-changed         macsec-changed.pcap            macsec-changed.out          -t -e
-macsec-integonly       macsec-integonly.pcap          macsec-integonly.out        -t -e
-macsec-snap            macsec-snap.pcap               macsec-snap.out             -t -e
-macsec-short-shorter   macsec-short-shorter.pcap      macsec-short-shorter.out    -t -e
-macsec-short-longer    macsec-short-longer.pcap       macsec-short-longer.out     -t -e
-macsec-short-valid     macsec-short-valid.pcap        macsec-short-valid.out      -t -e
+macsec-encrypted     macsec-encrypted.pcap     macsec-encrypted.out     -e
+macsec-changed       macsec-changed.pcap       macsec-changed.out       -e
+macsec-integonly     macsec-integonly.pcap     macsec-integonly.out     -e
+macsec-snap          macsec-snap.pcap          macsec-snap.out          -e
+macsec-short-shorter macsec-short-shorter.pcap macsec-short-shorter.out -e
+macsec-short-longer  macsec-short-longer.pcap  macsec-short-longer.out  -e
+macsec-short-valid   macsec-short-valid.pcap   macsec-short-valid.out   -e
 
 # NFS tests
 # fuzzed pcap

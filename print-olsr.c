@@ -322,16 +322,15 @@ olsr_print(netdissect_options *ndo,
     ndo->ndo_protocol = "olsr";
     tptr = pptr;
 
-    if (length < sizeof(struct olsr_common)) {
-        ND_PRINT(" (packet length < %zu)", sizeof(struct olsr_common));
-        goto invalid;
-    }
+    nd_print_protocol_caps(ndo);
+    ND_PRINT("v%u", (is_ipv6) ? 6 : 4);
+
+    ND_LCHECKMSG_ZU(length, sizeof(struct olsr_common), "packet length");
 
     ptr.common = (const struct olsr_common *)tptr;
     length = ND_MIN(length, GET_BE_U_2(ptr.common->packet_len));
 
-    ND_PRINT("OLSRv%i, seq 0x%04x, length %u",
-            (is_ipv6 == 0) ? 4 : 6,
+    ND_PRINT(", seq 0x%04x, length %u",
             GET_BE_U_2(ptr.common->packet_seq),
             length);
 
@@ -418,10 +417,7 @@ olsr_print(netdissect_options *ndo,
         switch (msg_type) {
         case OLSR_HELLO_MSG:
         case OLSR_HELLO_LQ_MSG:
-            if (msg_tlen < sizeof(struct olsr_hello)) {
-                ND_PRINT(" (message length < %zu)", sizeof(struct olsr_hello));
-                goto invalid;
-            }
+            ND_LCHECKMSG_ZU(msg_tlen, sizeof(struct olsr_hello), "message length");
 
             ptr.hello = (const struct olsr_hello *)msg_data;
             ND_PRINT("\n\t  hello-time %.3fs, MPR willingness %u",
@@ -479,10 +475,7 @@ olsr_print(netdissect_options *ndo,
 
         case OLSR_TC_MSG:
         case OLSR_TC_LQ_MSG:
-            if (msg_tlen < sizeof(struct olsr_tc)) {
-                goto invalid;
-                ND_PRINT(" (message length < %zu)", sizeof(struct olsr_tc));
-            }
+            ND_LCHECKMSG_ZU(msg_tlen, sizeof(struct olsr_tc), "message length");
             ND_TCHECK_LEN(msg_data, sizeof(struct olsr_tc));
 
             ptr.tc = (const struct olsr_tc *)msg_data;
@@ -612,10 +605,7 @@ olsr_print(netdissect_options *ndo,
             int name_entries_valid;
             u_int i;
 
-            if (msg_tlen < 4) {
-                ND_PRINT(" (message length < 4)");
-                goto invalid;
-            }
+            ND_LCHECKMSG_U(msg_tlen, 4, "message length");
 
             name_entries = GET_BE_U_2(msg_data + 2);
             addr_size = 4;
@@ -664,10 +654,8 @@ olsr_print(netdissect_options *ndo,
                 if (name_entry_len%4 != 0)
                     name_entry_padding = 4-(name_entry_len%4);
 
-                if (msg_tlen < addr_size + name_entry_len + name_entry_padding) {
-                    ND_PRINT(" (oversized name entry)");
-                    goto invalid;
-                }
+                ND_LCHECKMSG_U(msg_tlen, addr_size + name_entry_len + name_entry_padding,
+                               "name entry length");
 
                 ND_TCHECK_LEN(msg_data,
                               addr_size + name_entry_len + name_entry_padding);
@@ -678,7 +666,7 @@ olsr_print(netdissect_options *ndo,
                 else
                     ND_PRINT(", address %s, name \"",
                             GET_IPADDR_STRING(msg_data));
-                (void)nd_printn(ndo, msg_data + addr_size, name_entry_len, NULL);
+                nd_printjn(ndo, msg_data + addr_size, name_entry_len);
                 ND_PRINT("\"");
 
                 msg_data += addr_size + name_entry_len + name_entry_padding;

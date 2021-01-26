@@ -278,6 +278,7 @@ HDR = \
 	ethertype.h \
 	extract.h \
 	fptype.h \
+	ftmacros.h \
 	funcattrs.h \
 	getservent.h \
 	gmpls.h \
@@ -457,7 +458,8 @@ TAGS: $(TAGFILES)
 	etags $(TAGFILES)
 
 releasetar:
-	@name=$(PROG)-`cat VERSION` ; \
+	@autoreconf -f; \
+	name=$(PROG)-`cat VERSION` ; \
 	   mkdir $$name; \
 	   tar cf - $(CSRC) $(HDR) $(LIBNETDISSECT_SRC) $(EXTRA_DIST) $(TEST_DIST) | (cd $$name; tar xf -); \
 	   tar -c -z -f $$name.tar.gz $$name; \

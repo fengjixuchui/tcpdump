@@ -382,6 +382,28 @@ extern void nd_pop_all_packet_info(netdissect_options *);
  */
 #define ND_BYTES_AVAILABLE_AFTER(p) ND_BYTES_BETWEEN(ndo->ndo_snapend, (p))
 
+/* Check length < minimum for invalid packet with a custom message, format %u */
+#define ND_LCHECKMSG_U(length, minimum, what) \
+if ((length) < (minimum)) { \
+ND_PRINT(" [%s %u < %u]", (what), (length), (minimum)); \
+goto invalid; \
+}
+
+/* Check length < minimum for invalid packet with #length message, format %u */
+#define ND_LCHECK_U(length, minimum) \
+ND_LCHECKMSG_U((length), (minimum), (#length))
+
+/* Check length < minimum for invalid packet with a custom message, format %zu */
+#define ND_LCHECKMSG_ZU(length, minimum, what) \
+if ((length) < (minimum)) { \
+ND_PRINT(" [%s %u < %zu]", (what), (length), (minimum)); \
+goto invalid; \
+}
+
+/* Check length < minimum for invalid packet with #length message, format %zu */
+#define ND_LCHECK_ZU(length, minimum) \
+ND_LCHECKMSG_ZU((length), (minimum), (#length))
+
 #define ND_PRINT(...) (ndo->ndo_printf)(ndo, __VA_ARGS__)
 #define ND_DEFAULTPRINT(ap, length) (*ndo->ndo_default_print)(ndo, ap, length)
 
@@ -391,9 +413,9 @@ extern void unsigned_relts_print(netdissect_options *, uint32_t);
 
 extern void fn_print_char(netdissect_options *, u_char);
 extern void fn_print_str(netdissect_options *, const u_char *);
-extern int nd_print(netdissect_options *, const u_char *, const u_char *);
 extern u_int nd_printztn(netdissect_options *, const u_char *, u_int, const u_char *);
 extern int nd_printn(netdissect_options *, const u_char *, u_int, const u_char *);
+extern void nd_printjn(netdissect_options *, const u_char *, u_int);
 extern void nd_printjnp(netdissect_options *, const u_char *, u_int);
 
 /*

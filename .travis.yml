@@ -24,10 +24,9 @@ compiler:
   - clang
 
 #
-# Linux runs on all of the architectures listed above; macOS currently
-# runs only on 64-bit x86, although the Spaceshipologists are all in a
-# tizzy about the possibility of Arm-based Macs.  Suppress the macOS
-# builds that don't work.
+# Linux runs on all of the architectures listed above; macOS runs on
+# 64-bit x86 and 64-bit ARM, but Travis doesn't currently have a 64-bit
+# ARM macOS build environment.  Suppress the macOS builds that don't work.
 #
 # In addition, with newer versions of macOS, Apple ships a "gcc" that's
 # just another front end to Clang, presumably for backwards
@@ -101,11 +100,10 @@ env:
     - BUILD_LIBPCAP=yes CMAKE=no  REMOTE=disable CRYPTO=yes
     - BUILD_LIBPCAP=yes CMAKE=no  REMOTE=enable  CRYPTO=no
     - BUILD_LIBPCAP=yes CMAKE=no  REMOTE=enable  CRYPTO=yes
-# The 'BUILD_LIBPCAP=yes CMAKE=yes' builds currently fail
-#   - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=disable CRYPTO=no
-#   - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=disable CRYPTO=yes
-#   - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=enable  CRYPTO=no
-#   - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=enable  CRYPTO=yes
+    - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=disable CRYPTO=no
+    - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=disable CRYPTO=yes
+    - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=enable  CRYPTO=no
+    - BUILD_LIBPCAP=yes CMAKE=yes REMOTE=enable  CRYPTO=yes
 
 addons:
   coverity_scan:
@@ -154,28 +152,34 @@ before_script:
   - if [ "$BUILD_LIBPCAP" = yes ]; then (cd .. && echo '$ git clone [...] libpcap.git' && git clone --depth 3 --branch=master --quiet git://github.com/the-tcpdump-group/libpcap.git && cd libpcap && ./configure "--${REMOTE}-remote" --prefix=/tmp && make && make install); fi
 
 script:
-  - if [ "$COVERITY_SCAN_BRANCH" = 1 ]; then exit 0; fi
+  # On the other hand, using travis_terminate on macOS appears to
+  # *cause* the problem, so we do so only on Linux.
+  #
+  - if [ "$COVERITY_SCAN_BRANCH" = 1 ]; then if [ "$TRAVIS_OS_NAME" = linux ]; then travis_terminate 0; else exit 0; fi; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then OSX_SSL_DIR=$(ls /usr/local/Cellar/openssl); echo "OSX_SSL_DIR=$OSX_SSL_DIR"; fi
   - touch .devel configure
   - if [ "$CMAKE" = no ]; then echo '$ ./configure [...]' && echo travis_fold:start:script.configure; fi
-  - if [ "$CMAKE" = no ]; then ./configure --with-crypto=${CRYPTO} CPPFLAGS="-I/usr/local/Cellar/openssl/$OSX_SSL_DIR/include/" --prefix=/tmp; fi
+  - if [ "$CMAKE" = no ]; then PKG_CONFIG_PATH=/tmp/lib/pkgconfig ./configure --with-crypto=${CRYPTO} CPPFLAGS="-I/usr/local/Cellar/openssl/$OSX_SSL_DIR/include/" --prefix=/tmp; fi
   - if [ "$CMAKE" = no ]; then echo -n travis_fold:end:script.configure; fi
   - if [ "$CMAKE" = yes ]; then mkdir build; fi
   - if [ "$CMAKE" = yes ]; then cd build; fi
-  - if [ "$CMAKE" = yes ]; then echo travis_fold:start:script.cmake; fi
+  - if [ "$CMAKE" = yes ]; then echo '$ cmake [...]' && echo travis_fold:start:script.cmake; fi
   - if [ "$CMAKE" = yes ]; then cmake -DWITH_CRYPTO="$CRYPTO" -DCMAKE_PREFIX_PATH=/tmp -DCMAKE_INSTALL_PREFIX=/tmp ..; fi
   - if [ "$CMAKE" = yes ]; then echo -n travis_fold:end:script.cmake; fi
   - make -s CFLAGS=-Werror
   - echo '$ make install [...]' && echo travis_fold:start:script.make_install
   - PATH=$PATH make install
   - echo -n travis_fold:end:script.make_install
+  - if [ "$TRAVIS_OS_NAME" = linux ]; then echo '$ ldd tcpdump' && echo travis_fold:start:script.ldd_tcpdump; fi
+  - if [ "$TRAVIS_OS_NAME" = linux ]; then ldd tcpdump; fi
+  - if [ "$TRAVIS_OS_NAME" = linux ]; then echo -n travis_fold:end:script.ldd_tcpdump; fi
   - if [ "$BUILD_LIBPCAP" = yes ]; then make check; fi
   - ./tcpdump --version
   - ./tcpdump -h
   - ./tcpdump -D
   - sudo ./tcpdump -J
   - sudo ./tcpdump -L
-  - if [ "$TRAVIS_OS_NAME" = linux -a "$TRAVIS_CPU_ARCH" != ppc64le -a "$TRAVIS_CPU_ARCH" != s390x ]; then sudo ./tcpdump -#n -c 10; fi
+  - if [ "$TRAVIS_OS_NAME" = linux -a "$TRAVIS_CPU_ARCH" != ppc64le -a "$TRAVIS_CPU_ARCH" != s390x -a "$TRAVIS_CPU_ARCH" != arm64 ]; then sudo ./tcpdump -#n -c 10; fi
   - if [ "$CMAKE" = no ]; then make releasetar; fi
   - echo '$ cat Makefile [...]'; echo travis_fold:start:script.cat_makefile
   - if [ "$CMAKE" = no ]; then cat Makefile | sed -n '1,/DO NOT DELETE THIS LINE -- mkdep uses it/p'; fi

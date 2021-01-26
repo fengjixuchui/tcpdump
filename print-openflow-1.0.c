@@ -318,7 +318,6 @@ static const struct tok ofp_capabilities_bm[] = {
 #define OFPC_FRAG_NORMAL 0x0000U
 #define OFPC_FRAG_DROP   0x0001U
 #define OFPC_FRAG_REASM  0x0002U
-#define OFPC_FRAG_MASK   0x0003U
 static const struct tok ofp_config_str[] = {
 	{ OFPC_FRAG_NORMAL, "FRAG_NORMAL" },
 	{ OFPC_FRAG_DROP,   "FRAG_DROP"   },
@@ -828,7 +827,7 @@ of10_bsn_message_print(netdissect_options *ndo,
 		OF_FWD(4);
 		/* data */
 		ND_PRINT(", data '");
-		(void)nd_printn(ndo, cp, len, NULL);
+		nd_printjn(ndo, cp, len);
 		ND_PRINT("'");
 		break;
 	case BSN_SHELL_OUTPUT:
@@ -845,7 +844,7 @@ of10_bsn_message_print(netdissect_options *ndo,
 		/* already checked that len >= 4 */
 		/* data */
 		ND_PRINT(", data '");
-		(void)nd_printn(ndo, cp, len, NULL);
+		nd_printjn(ndo, cp, len);
 		ND_PRINT("'");
 		break;
 	case BSN_SHELL_STATUS:
@@ -1018,7 +1017,18 @@ of10_packet_data_print(netdissect_options *ndo,
 	}
 	ndo->ndo_vflag -= 3;
 	ND_PRINT(", frame decoding below\n");
+	/*
+	 * The encapsulated Ethernet frame is not necessarily the last
+	 * data of this packet (i.e. there may be more OpenFlow messages
+	 * after the current OFPT_PACKET_IN/OFPT_PACKET_OUT message, in
+	 * which case the current (outer) packet's snapshot end is not
+	 * what ether_print() needs to decode an Ethernet frame nested in
+	 * the middle of a TCP payload.
+	 */
+	const u_char *snapend_save = ndo->ndo_snapend;
+	ndo->ndo_snapend = ND_MIN(cp + len, ndo->ndo_snapend);
 	ether_print(ndo, cp, len, ND_BYTES_AVAILABLE_AFTER(cp), NULL, NULL);
+	ndo->ndo_snapend = snapend_save;
 	ndo->ndo_vflag += 3;
 }
 
@@ -1542,15 +1552,15 @@ of10_port_mod_print(netdissect_options *ndo,
 	ND_PRINT(", hw_addr %s", GET_ETHERADDR_STRING(cp));
 	cp += MAC_ADDR_LEN;
 	/* config */
-	ND_PRINT("\n\t config 0x%08x", GET_BE_U_4(cp));
+	ND_PRINT("\n\t  config 0x%08x", GET_BE_U_4(cp));
 	of_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
 	cp += 4;
 	/* mask */
-	ND_PRINT("\n\t mask 0x%08x", GET_BE_U_4(cp));
+	ND_PRINT("\n\t  mask 0x%08x", GET_BE_U_4(cp));
 	of_bitmap_print(ndo, ofppc_bm, GET_BE_U_4(cp), OFPPC_U);
 	cp += 4;
 	/* advertise */
-	ND_PRINT("\n\t advertise 0x%08x", GET_BE_U_4(cp));
+	ND_PRINT("\n\t  advertise 0x%08x", GET_BE_U_4(cp));
 	of_bitmap_print(ndo, ofppf_bm, GET_BE_U_4(cp), OFPPF_U);
 	cp += 4;
 	/* pad */

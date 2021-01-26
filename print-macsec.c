@@ -87,9 +87,10 @@ static const struct tok macsec_flag_values[] = {
 	{ 0, NULL }
 };
 
-static void macsec_print_header(netdissect_options *ndo,
-				const struct macsec_sectag *sectag,
-				u_int short_length)
+static void
+macsec_print_header(netdissect_options *ndo,
+		    const struct macsec_sectag *sectag,
+		    u_int short_length)
 {
 	ND_PRINT("an %u, pn %u, flags %s",
 		 GET_U_1(sectag->tci_an) & MACSEC_AN_MASK,
@@ -107,9 +108,10 @@ static void macsec_print_header(netdissect_options *ndo,
 }
 
 /* returns < 0 iff the packet can be decoded completely */
-int macsec_print(netdissect_options *ndo, const u_char **bp,
-		 u_int *lengthp, u_int *caplenp, u_int *hdrlenp,
-		 const struct lladdr_info *src, const struct lladdr_info *dst)
+int
+macsec_print(netdissect_options *ndo, const u_char **bp,
+	     u_int *lengthp, u_int *caplenp, u_int *hdrlenp,
+	     const struct lladdr_info *src, const struct lladdr_info *dst)
 {
 	const char *save_protocol;
 	const u_char *p = *bp;
@@ -217,6 +219,13 @@ int macsec_print(netdissect_options *ndo, const u_char **bp,
 	}
 	*lengthp -= MACSEC_DEFAULT_ICV_LEN;
 	*caplenp -= MACSEC_DEFAULT_ICV_LEN;
+	/*
+	 * Update the snapend thus the ICV field is not in the payload for
+	 * the caller.
+	 * The ICV (Integrity Check Value) is at the end of the frame, after
+	 * the secure data.
+	 */
+	ndo->ndo_snapend -= MACSEC_DEFAULT_ICV_LEN;
 
 	/*
 	 * If the SL field is non-zero, then it's the length of the

@@ -95,33 +95,6 @@ fn_print_str(netdissect_options *ndo, const u_char *s)
 }
 
 /*
- * Print out a null-terminated filename (or other ASCII string), part of
- * the packet buffer.
- * If ep is NULL, assume no truncation check is needed.
- * Return true if truncated.
- * Stop at ep (if given) or before the null char, whichever is first.
- */
-int
-nd_print(netdissect_options *ndo,
-         const u_char *s, const u_char *ep)
-{
-	int ret;
-	u_char c;
-
-	ret = 1;			/* assume truncated */
-	while (ep == NULL || s < ep) {
-		c = GET_U_1(s);
-		s++;
-		if (c == '\0') {
-			ret = 0;
-			break;
-		}
-		fn_print_char(ndo, c);
-	}
-	return(ret);
-}
-
-/*
  * Print out a null-terminated filename (or other ASCII string) from
  * a fixed-length field in the packet buffer, or from what remains of
  * the packet.
@@ -196,6 +169,23 @@ nd_printn(netdissect_options *ndo,
 		fn_print_char(ndo, c);
 	}
 	return (n == 0) ? 0 : 1;
+}
+
+/*
+ * Print a counted filename (or other ASCII string), part of
+ * the packet buffer, filtering out non-printable characters.
+ * Stop if truncated (via GET_U_1/longjmp) or after n bytes,
+ * whichever is first.
+ * The suffix comes from: j:longJmp, n:after N bytes.
+ */
+void
+nd_printjn(netdissect_options *ndo, const u_char *s, u_int n)
+{
+	while (n > 0) {
+		fn_print_char(ndo, GET_U_1(s));
+		n--;
+		s++;
+	}
 }
 
 /*
@@ -468,17 +458,12 @@ int
 print_unknown_data(netdissect_options *ndo, const u_char *cp,
                    const char *ident, u_int len)
 {
-	u_int len_to_print;
-
-	len_to_print = len;
 	if (!ND_TTEST_LEN(cp, 0)) {
-		ND_PRINT("%sDissector error: print_unknown_data called with pointer past end of packet",
-		    ident);
+		ND_PRINT("%sDissector error: %s() called with pointer past end of packet",
+		    ident, __func__);
 		return(0);
 	}
-	if (ND_BYTES_AVAILABLE_AFTER(cp) < len_to_print)
-		len_to_print = ND_BYTES_AVAILABLE_AFTER(cp);
-	hex_print(ndo, ident, cp, len_to_print);
+	hex_print(ndo, ident, cp, ND_MIN(len, ND_BYTES_AVAILABLE_AFTER(cp)));
 	return(1); /* everything is ok */
 }
 
