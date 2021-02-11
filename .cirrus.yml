@@ -3,35 +3,45 @@ env:
   LIBPCAP_GIT: https://github.com/the-tcpdump-group/libpcap.git
 
 freebsd_task:
-  name: FBSD
+  name: FBSD+BM
   freebsd_instance:
-    cpu: 4 # allows two concurrent FreeBSD tasks
+    # FreeBSD fails to start with 1 GB. 8 CPUs max concurrency.
     matrix:
       - image_family: freebsd-11-4
+        cpu: 2
+        memory: 2G
       - image_family: freebsd-12-2
+        cpu: 2
+        memory: 2G
       - image_family: freebsd-13-0-snap
+        # This one is much slower than the others.
+        cpu: 4
+        memory: 4G
   env:
     IGNORE_OSVERSION: yes
     MAKEFLAGS: -j 4
+    MATRIX_CC: clang gcc10
   script:
     - freebsd-version
-    - pkg install -qy git autoconf
-    - (cd .. && git clone --depth ${CIRRUS_CLONE_DEPTH} --branch=master --quiet ${LIBPCAP_GIT} && cd libpcap && ./configure --prefix=/tmp && make -s)
-    - touch .devel
-    - ./configure --prefix=/tmp
-    - make -s CFLAGS=-Werror all
-    - make check
-    - make install
-    - make releasetar
+    - pkg install -qy git autoconf gcc10
+    - pkg install -qy bash cmake # for build_matrix.sh and build.sh
+    - pkg install -qy pkgconf # for cmake, replaces pkg-config
+    - (cd .. && echo '$ git clone [...] libpcap.git' && git clone --depth ${CIRRUS_CLONE_DEPTH} --branch=master --quiet ${LIBPCAP_GIT})
+    - ./build_matrix.sh
 
 linux_task:
   name: LNX+BM
   container:
-    cpu: 8 # allows one concurrent Linux task
+    # Linux works just fine with 1 GB. 16 CPUs max concurrency.
+    cpu: 4
+    memory: 1G
     image: ubuntu:20.04
   env:
     DEBIAN_FRONTEND: noninteractive
-    MAKEFLAGS: -j 8
+    MAKEFLAGS: -j 5
+    matrix:
+      - MATRIX_CC: gcc
+      - MATRIX_CC: clang
   script:
     - apt-get -qy update
     - apt-get -qy install git autoconf make cmake clang gcc
@@ -45,8 +55,9 @@ macos_task:
   name: MAC+BM
   macos_instance:
     image: big-sur-xcode
+    # "cpu" and "memory" are invalid keywords for macOS tasks now
   env:
-    MAKEFLAGS: '-j 12' # macOS VMs always run on 12 cores
+    MAKEFLAGS: '-j 12'
     MATRIX_CC: clang # GCC is a symlink to Clang in macOS
   script:
     - brew update >/dev/null

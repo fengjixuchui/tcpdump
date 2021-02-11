@@ -85,7 +85,7 @@ touch .devel configure
 for BUILD_LIBPCAP in ${MATRIX_BUILD_LIBPCAP:-no yes}; do
 export BUILD_LIBPCAP
     if [ "$BUILD_LIBPCAP" = yes ]; then
-        for REMOTE in ${MATRIX_REMOTE:-no yes}; do
+        for REMOTE in ${MATRIX_REMOTE:-no}; do
             export REMOTE
             choose_libpcap
             # Set PKG_CONFIG_PATH for configure when building libpcap
